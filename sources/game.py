@@ -56,7 +56,7 @@ class Game:
         self.state = GameState.WAITING
         self.state_timer = INITIAL_WAIT
 
-    def update(self, dt, keys, events):
+    def update(self, dt, keys, events, arena_offset=(0, 0)):
         for event in events:
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
@@ -65,7 +65,7 @@ class Game:
                 if event.key == pygame.K_u:
                     self.hud_locked = not self.hud_locked
 
-        self.enemy_list.update(events, self.hud_locked)
+        self.enemy_list.update(events, self.hud_locked, arena_offset)
 
         if self.state == GameState.WAITING:
             self.state_timer -= dt
@@ -78,6 +78,8 @@ class Game:
         elif self.state == GameState.CASTING:
             self.state_timer -= dt
             self.player.update(dt, keys)
+            for attack in self.attacks:
+                attack.update(dt)
             if self.state_timer <= 0:
                 self._check_hits()
                 if self.player_was_hit:
@@ -111,11 +113,14 @@ class Game:
                 attack.render(surface, telegraphing=True, alpha=TELEGRAPH_ALPHA, offset=arena_offset)
             elif self.state == GameState.RESOLVING:
                 attack.render(surface, telegraphing=False, alpha=self._attack_alpha(), offset=arena_offset)
+        if self.state == GameState.CASTING:
+            for attack in self.attacks:
+                attack.render_ring(surface, arena_offset)
 
         self.player.render(surface, arena_offset)
 
         is_casting = self.state == GameState.CASTING
-        self.enemy_list.render(surface, is_casting, self.state_timer, self.hud_locked)
+        self.enemy_list.render(surface, is_casting, self.state_timer, self.hud_locked, arena_offset)
 
         if self.state == GameState.GAME_OVER:
             self._render_game_over(surface, arena_offset)

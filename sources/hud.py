@@ -1,6 +1,6 @@
 import pygame
 from constants import (
-    WINDOW_WIDTH, WINDOW_HEIGHT,
+    ARENA_CENTER,
     ENEMY_LIST_WIDTH, ENEMY_LIST_HEIGHT,
     CAST_DURATION, CAST_BAR_COLOR, CAST_BAR_BG_COLOR,
     FONT_NAME, FONT_SIZE_NORMAL, FONT_SIZE_SMALL,
@@ -20,8 +20,8 @@ def _make_bg(w, h, locked):
 
 class EnemyList:
     def __init__(self):
-        x = WINDOW_WIDTH - 100 - ENEMY_LIST_WIDTH
-        y = WINDOW_HEIGHT // 2 - ENEMY_LIST_HEIGHT // 2
+        x = ARENA_CENTER[0] + 400
+        y = ARENA_CENTER[1] - ENEMY_LIST_HEIGHT // 2
         self.rect = pygame.Rect(x, y, ENEMY_LIST_WIDTH, ENEMY_LIST_HEIGHT)
         self._is_dragging = False
         self._drag_offset = (0, 0)
@@ -30,27 +30,31 @@ class EnemyList:
         self._bg_locked = _make_bg(ENEMY_LIST_WIDTH, ENEMY_LIST_HEIGHT, locked=True)
         self._bg_unlocked = _make_bg(ENEMY_LIST_WIDTH, ENEMY_LIST_HEIGHT, locked=False)
 
-    def update(self, events, locked):
+    def update(self, events, locked, arena_offset=(0, 0)):
         if locked:
             self._is_dragging = False
             return
+        ox, oy = arena_offset
+        screen_rect = self.rect.move(ox, oy)
         for event in events:
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if self.rect.collidepoint(event.pos):
+                if screen_rect.collidepoint(event.pos):
                     self._is_dragging = True
-                    self._drag_offset = (event.pos[0] - self.rect.x, event.pos[1] - self.rect.y)
+                    self._drag_offset = (event.pos[0] - screen_rect.x, event.pos[1] - screen_rect.y)
             elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                 self._is_dragging = False
             elif event.type == pygame.MOUSEMOTION and self._is_dragging:
-                self.rect.x = event.pos[0] - self._drag_offset[0]
-                self.rect.y = event.pos[1] - self._drag_offset[1]
+                self.rect.x = event.pos[0] - self._drag_offset[0] - ox
+                self.rect.y = event.pos[1] - self._drag_offset[1] - oy
 
-    def render(self, surface, is_casting, cast_timer, locked):
-        surface.blit(self._bg_locked if locked else self._bg_unlocked, self.rect.topleft)
+    def render(self, surface, is_casting, cast_timer, locked, arena_offset=(0, 0)):
+        ox, oy = arena_offset
+        screen_rect = self.rect.move(ox, oy)
+        surface.blit(self._bg_locked if locked else self._bg_unlocked, screen_rect.topleft)
 
         pad = 8
-        x = self.rect.x + pad
-        y = self.rect.y + pad
+        x = screen_rect.x + pad
+        y = screen_rect.y + pad
 
         name = self._font.render("Kefka", True, (255, 255, 255))
 
@@ -62,7 +66,7 @@ class EnemyList:
             surface.blit(name, (x, name_y))
 
             bar_x = x + name.get_width() + 8
-            bar_w = self.rect.right - pad - bar_x
+            bar_w = screen_rect.right - pad - bar_x
             surface.blit(attack_label, (bar_x, y))
             bar_y = y + attack_label.get_height() + 2
             progress = max(0.0, (CAST_DURATION - cast_timer) / CAST_DURATION)
