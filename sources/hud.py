@@ -76,6 +76,15 @@ class EnemyList:
             surface.blit(name, (x, y))
 
 
+class FpsCounter:
+    def __init__(self):
+        self._font = _make_font(FONT_NAME, FONT_SIZE_SMALL)
+
+    def render(self, surface, fps):
+        text = self._font.render(f"{fps:.0f} FPS", True, (255, 255, 255))
+        surface.blit(text, text.get_rect(topright=(surface.get_width() - 10, 10)))
+
+
 class Legend:
     _LINES = ["(ESC) Quit", "(R) Restart", "(U) Unlock/Lock HUD"]
 

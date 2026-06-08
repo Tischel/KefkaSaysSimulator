@@ -6,9 +6,9 @@ _ASSETS = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'assets'
 
 
 class Player:
-    def __init__(self):
-        self._icon = pygame.image.load(os.path.join(_ASSETS, 'T1.png')).convert_alpha()
-        self.position = pygame.Vector2(ARENA_CENTER)
+    def __init__(self, role='T1', start_pos=None):
+        self._icon = pygame.image.load(os.path.join(_ASSETS, f'{role}.png')).convert_alpha()
+        self.position = pygame.Vector2(start_pos if start_pos is not None else ARENA_CENTER)
 
     def update(self, dt, keys):
         dx = keys[pygame.K_d] - keys[pygame.K_a]

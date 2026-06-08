@@ -49,3 +49,22 @@ FONT_NAME = "arial"
 FONT_SIZE_LARGE = 48
 FONT_SIZE_NORMAL = 20
 FONT_SIZE_SMALL = 14
+
+# Safe spot destinations for each of the 8 attack combinations.
+# Key: (lightning_angle, lightning_pair_idx, ice_pair_idx)
+#   lightning_angle:    45 or -45 degrees
+#   lightning_pair_idx: 0 = stripes at offsets [-294, 98] are dangerous
+#                       1 = stripes at offsets [-98, 294] are dangerous
+#   ice_pair_idx:       0 = NW+SE quadrants are dangerous
+#                       1 = NE+SW quadrants are dangerous
+# Value: (x, y) in game-space coordinates (arena center = 400, 400)
+SAFE_SPOTS = {
+    ( 45, 0, 0): (-80, 80),  # +45° pair A | Ice NW+SE
+    ( 45, 0, 1): [(40, 100), (-100, -40)],  # +45° pair A | Ice NE+SW
+    ( 45, 1, 0): (80, -80),  # +45° pair B | Ice NW+SE
+    ( 45, 1, 1): [(100, 40), (-40, -100)],  # +45° pair B | Ice NE+SW
+    (-45, 0, 0): [(40, -100), (-100, 40)],  # -45° pair A | Ice NW+SE
+    (-45, 0, 1): (-80, -80),  # -45° pair A | Ice NE+SW
+    (-45, 1, 0): [(100, -40), (-40, 100)],  # -45° pair B | Ice NW+SE
+    (-45, 1, 1): (80, 80),  # -45° pair B | Ice NE+SW
+}

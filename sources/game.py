@@ -1,3 +1,4 @@
+import random
 import pygame
 from enum import Enum
 from constants import (
@@ -6,10 +7,12 @@ from constants import (
     INITIAL_WAIT, CAST_DURATION, ATTACK_DURATION, COOLDOWN_DURATION,
     ATTACK_ALPHA_START, TELEGRAPH_ALPHA,
     FONT_NAME, FONT_SIZE_LARGE, FONT_SIZE_NORMAL,
+    SAFE_SPOTS,
 )
 from arena import Arena
 from player import Player
 from attacks import LightningAttack, IceAttack
+from bot import Bot, circle_positions, CIRCLE_ORDER
 from hud import EnemyList, _make_font
 
 
@@ -22,9 +25,13 @@ class GameState(Enum):
 
 
 class Game:
-    def __init__(self):
+    def __init__(self, role='T1'):
+        self._role = role
         self.arena = Arena()
-        self.player = Player()
+        positions = circle_positions()
+        self._player_start = positions[role]
+        self.player = Player(role, self._player_start)
+        self.bots = [Bot(r, positions[r]) for r in CIRCLE_ORDER if r != role]
         self.enemy_list = EnemyList()
         self.attacks = []
         self.state = GameState.WAITING
@@ -35,11 +42,21 @@ class Game:
         self._font_normal = _make_font(FONT_NAME, FONT_SIZE_NORMAL)
         self._overlay = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
         self._overlay.fill((0, 0, 0, 153))
-        self._arena_mask = None
-        self._arena_mask_size = None
+        self._attack_surf = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
+        self._attack_mask = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
+        self._attack_mask.fill((0, 0, 0, 0))
+        pygame.draw.circle(self._attack_mask, (255, 255, 255, 255), ARENA_CENTER, ARENA_RADIUS)
 
     def _generate_attacks(self):
-        self.attacks = [LightningAttack(), IceAttack()]
+        lightning = LightningAttack()
+        ice = IceAttack()
+        self.attacks = [lightning, ice]
+        key = (lightning.angle, lightning.effective_pair_idx, ice.effective_pair_idx)
+        spot = SAFE_SPOTS[key]
+        for bot in self.bots:
+            s = random.choice(spot) if isinstance(spot, list) else spot
+            base_dest = (ARENA_CENTER[0] + s[0], ARENA_CENTER[1] + s[1])
+            bot.set_destination(base_dest)
 
     def _check_hits(self):
         point = self.player.get_center()
@@ -53,7 +70,9 @@ class Game:
         return int(ATTACK_ALPHA_START * t)
 
     def _reset(self):
-        self.player = Player()
+        self.player = Player(self._role, self._player_start)
+        for bot in self.bots:
+            bot.reset()
         self.attacks = []
         self.player_was_hit = False
         self.state = GameState.WAITING
@@ -83,6 +102,8 @@ class Game:
             self.player.update(dt, keys)
             for attack in self.attacks:
                 attack.update(dt)
+            for bot in self.bots:
+                bot.update(dt, self.state_timer)
             if self.state_timer <= 0:
                 self._check_hits()
                 if self.player_was_hit:
@@ -108,34 +129,24 @@ class Game:
                 self.state = GameState.CASTING
                 self.state_timer = CAST_DURATION
 
-    def _get_arena_mask(self, size, arena_offset):
-        if self._arena_mask_size != size:
-            mask = pygame.Surface(size, pygame.SRCALPHA)
-            mask.fill((0, 0, 0, 0))
-            cx = ARENA_CENTER[0] + arena_offset[0]
-            cy = ARENA_CENTER[1] + arena_offset[1]
-            pygame.draw.circle(mask, (255, 255, 255, 255), (cx, cy), ARENA_RADIUS)
-            self._arena_mask = mask
-            self._arena_mask_size = size
-        return self._arena_mask
-
     def render(self, surface, arena_offset=(0, 0)):
         self.arena.render(surface, arena_offset)
 
         if self.attacks:
-            size = surface.get_size()
-            temp = pygame.Surface(size, pygame.SRCALPHA)
+            self._attack_surf.fill((0, 0, 0, 0))
             for attack in self.attacks:
                 if self.state == GameState.CASTING:
-                    attack.render(temp, telegraphing=True, alpha=TELEGRAPH_ALPHA, offset=arena_offset)
+                    attack.render(self._attack_surf, telegraphing=True, alpha=TELEGRAPH_ALPHA, offset=(0, 0))
                 elif self.state == GameState.RESOLVING:
-                    attack.render(temp, telegraphing=False, alpha=self._attack_alpha(), offset=arena_offset)
+                    attack.render(self._attack_surf, telegraphing=False, alpha=self._attack_alpha(), offset=(0, 0))
             if self.state == GameState.CASTING:
                 for attack in self.attacks:
-                    attack.render_ring(temp, arena_offset)
-            temp.blit(self._get_arena_mask(size, arena_offset), (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-            surface.blit(temp, (0, 0))
+                    attack.render_ring(self._attack_surf, (0, 0))
+            self._attack_surf.blit(self._attack_mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+            surface.blit(self._attack_surf, arena_offset)
 
+        for bot in self.bots:
+            bot.render(surface, arena_offset)
         self.player.render(surface, arena_offset)
 
         is_casting = self.state == GameState.CASTING

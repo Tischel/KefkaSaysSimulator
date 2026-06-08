@@ -42,6 +42,37 @@ def _draw_ring(surface, center, angle, color, offset, fake=False):
         surface.blit(orb_img, orb_img.get_rect(center=(px, py)))
 
 
+def compute_safe_centroid(lightning, ice):
+    """Return the centroid of the safe intersection region closest to the arena center."""
+    cx, cy = ARENA_CENTER
+    s = ICE_RECT_SIZE
+    quadrants = [
+        pygame.Rect(cx - s, cy - s, s, s),  # NW
+        pygame.Rect(cx,     cy - s, s, s),  # NE
+        pygame.Rect(cx - s, cy,     s, s),  # SW
+        pygame.Rect(cx,     cy,     s, s),  # SE
+    ]
+    n = 15
+    candidates = []
+    for quad in quadrants:
+        sx_step = quad.width / n
+        sy_step = quad.height / n
+        sum_x = sum_y = count = 0
+        for i in range(n):
+            for j in range(n):
+                x = quad.x + (i + 0.5) * sx_step
+                y = quad.y + (j + 0.5) * sy_step
+                if not lightning.is_hit((x, y)) and not ice.is_hit((x, y)):
+                    sum_x += x
+                    sum_y += y
+                    count += 1
+        if count > 0:
+            candidates.append((sum_x / count, sum_y / count))
+    if not candidates:
+        return ARENA_CENTER
+    return min(candidates, key=lambda p: (p[0] - cx) ** 2 + (p[1] - cy) ** 2)
+
+
 class LightningAttack:
     def __init__(self):
         self.angle = random.choice([45, -45])
@@ -50,6 +81,7 @@ class LightningAttack:
         origin = pygame.Vector2(ARENA_CENTER)
         all_offsets = [[-294, 98], [-98, 294]]
         idx = random.randint(0, 1)
+        self._idx = idx
         self.centers = [origin + perp * o for o in all_offsets[idx]]
         self._inverted_centers = [origin + perp * o for o in all_offsets[1 - idx]]
         self._ring_center = (ARENA_CENTER[0] + LIGHTNING_RING_OFFSET[0],
@@ -57,6 +89,10 @@ class LightningAttack:
         self._ring_color = LIGHTNING_RING_COLOR
         self._ring_angle = 0.0
         self.is_fake = random.choice([True, False])
+
+    @property
+    def effective_pair_idx(self):
+        return self._idx if not self.is_fake else 1 - self._idx
 
     def update(self, dt):
         self._ring_angle += (2 * math.pi / ORB_REVOLUTION_TIME) * dt
@@ -102,6 +138,7 @@ class IceAttack:
         }
         pairs = [('NW', 'SE'), ('NE', 'SW')]
         idx = random.randint(0, 1)
+        self._idx = idx
         a, b = pairs[idx]
         inv_a, inv_b = pairs[1 - idx]
         self.rects = [quads[a], quads[b]]
@@ -111,6 +148,10 @@ class IceAttack:
         self._ring_color = ICE_RING_COLOR
         self._ring_angle = 0.0
         self.is_fake = random.choice([True, False])
+
+    @property
+    def effective_pair_idx(self):
+        return self._idx if not self.is_fake else 1 - self._idx
 
     def update(self, dt):
         self._ring_angle += (2 * math.pi / ORB_REVOLUTION_TIME) * dt
