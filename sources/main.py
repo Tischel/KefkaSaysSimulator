@@ -10,7 +10,9 @@ def main():
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.RESIZABLE)
     pygame.display.set_caption("Kefka Says Simulator")
-    ctypes.windll.user32.ShowWindow(pygame.display.get_wm_info()['window'], 3)
+    hwnd = pygame.display.get_wm_info()['window']
+    ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0001 | 0x0004)  # move to primary monitor origin, keep size/z-order
+    ctypes.windll.user32.ShowWindow(hwnd, 3)
     clock = pygame.time.Clock()
     game = Game()
     legend = Legend()

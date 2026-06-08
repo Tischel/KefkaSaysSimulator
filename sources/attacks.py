@@ -9,6 +9,7 @@ from constants import (
     ICE_COLOR, ICE_TELEGRAPH_COLOR, ICE_RECT_SIZE,
     ICE_RING_OFFSET, ICE_RING_COLOR,
     TELEGRAPH_RING_W, TELEGRAPH_RING_H, TELEGRAPH_RING_LINE_W, ORB_REVOLUTION_TIME,
+    TELEGRAPH_BORDER_COLOR, TELEGRAPH_BORDER_WIDTH,
 )
 
 _ASSETS = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'assets'))
@@ -67,6 +68,8 @@ class LightningAttack:
         for c in centers:
             surf = pygame.Surface((LIGHTNING_RECT_W, LIGHTNING_RECT_H), pygame.SRCALPHA)
             surf.fill((*color, alpha))
+            if telegraphing:
+                pygame.draw.rect(surf, (*TELEGRAPH_BORDER_COLOR, alpha), surf.get_rect(), TELEGRAPH_BORDER_WIDTH)
             rotated = pygame.transform.rotate(surf, self.angle)
             surface.blit(rotated, rotated.get_rect(center=(int(c.x) + ox, int(c.y) + oy)))
 
@@ -120,6 +123,8 @@ class IceAttack:
         for rect in rects:
             surf = pygame.Surface((s, s), pygame.SRCALPHA)
             surf.fill((*color, alpha))
+            if telegraphing:
+                pygame.draw.rect(surf, (*TELEGRAPH_BORDER_COLOR, alpha), surf.get_rect(), TELEGRAPH_BORDER_WIDTH)
             surface.blit(surf, (rect.x + ox, rect.y + oy))
 
     def render_ring(self, surface, offset=(0, 0)):

@@ -2,6 +2,7 @@ import pygame
 from enum import Enum
 from constants import (
     WINDOW_WIDTH, WINDOW_HEIGHT,
+    ARENA_CENTER, ARENA_RADIUS,
     INITIAL_WAIT, CAST_DURATION, ATTACK_DURATION, COOLDOWN_DURATION,
     ATTACK_ALPHA_START, TELEGRAPH_ALPHA,
     FONT_NAME, FONT_SIZE_LARGE, FONT_SIZE_NORMAL,
@@ -34,6 +35,8 @@ class Game:
         self._font_normal = _make_font(FONT_NAME, FONT_SIZE_NORMAL)
         self._overlay = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
         self._overlay.fill((0, 0, 0, 153))
+        self._arena_mask = None
+        self._arena_mask_size = None
 
     def _generate_attacks(self):
         self.attacks = [LightningAttack(), IceAttack()]
@@ -105,17 +108,33 @@ class Game:
                 self.state = GameState.CASTING
                 self.state_timer = CAST_DURATION
 
+    def _get_arena_mask(self, size, arena_offset):
+        if self._arena_mask_size != size:
+            mask = pygame.Surface(size, pygame.SRCALPHA)
+            mask.fill((0, 0, 0, 0))
+            cx = ARENA_CENTER[0] + arena_offset[0]
+            cy = ARENA_CENTER[1] + arena_offset[1]
+            pygame.draw.circle(mask, (255, 255, 255, 255), (cx, cy), ARENA_RADIUS)
+            self._arena_mask = mask
+            self._arena_mask_size = size
+        return self._arena_mask
+
     def render(self, surface, arena_offset=(0, 0)):
         self.arena.render(surface, arena_offset)
 
-        for attack in self.attacks:
-            if self.state == GameState.CASTING:
-                attack.render(surface, telegraphing=True, alpha=TELEGRAPH_ALPHA, offset=arena_offset)
-            elif self.state == GameState.RESOLVING:
-                attack.render(surface, telegraphing=False, alpha=self._attack_alpha(), offset=arena_offset)
-        if self.state == GameState.CASTING:
+        if self.attacks:
+            size = surface.get_size()
+            temp = pygame.Surface(size, pygame.SRCALPHA)
             for attack in self.attacks:
-                attack.render_ring(surface, arena_offset)
+                if self.state == GameState.CASTING:
+                    attack.render(temp, telegraphing=True, alpha=TELEGRAPH_ALPHA, offset=arena_offset)
+                elif self.state == GameState.RESOLVING:
+                    attack.render(temp, telegraphing=False, alpha=self._attack_alpha(), offset=arena_offset)
+            if self.state == GameState.CASTING:
+                for attack in self.attacks:
+                    attack.render_ring(temp, arena_offset)
+            temp.blit(self._get_arena_mask(size, arena_offset), (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+            surface.blit(temp, (0, 0))
 
         self.player.render(surface, arena_offset)
 
