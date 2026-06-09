@@ -20,6 +20,10 @@ class Enemies:
         ))
 
     @property
+    def chaos_rect(self):
+        return self._chaos[1]
+
+    @property
     def chaos_center(self):
         return self._chaos[1].center
 

@@ -15,7 +15,7 @@ from attacks import LightningAttack, IceAttack, RingOnlyAttack
 from bot import Bot, circle_positions, CIRCLE_ORDER
 from debuff import Debuff
 from enemies import Enemies
-from hud import EnemyList, PartyList, _make_font
+from hud import EnemyList, PartyList, MacroOutput, MacroButtons, _make_font
 
 
 class GameState(Enum):
@@ -76,7 +76,9 @@ class Game:
             self._members[bot.role] = bot
         self.enemies = Enemies()
         self.enemy_list = EnemyList()
-        self.party_list = PartyList(PARTY_LIST_ORDER, role)
+        self.party_list = PartyList(PARTY_LIST_ORDER, role, self.enemies.chaos_rect.left)
+        self.macro_output = MacroOutput(self.enemy_list)
+        self.macro_buttons = MacroButtons(self.macro_output)
         self.state = GameState.RUNNING
         self.player_was_hit = False
         self._font_large = _make_font(FONT_NAME, FONT_SIZE_LARGE)
@@ -120,14 +122,14 @@ class Game:
                 self._pending_actions.append((t + duration, action, is_fake))
                 nx, ny = self.enemies.neo_center
                 neo_offset = (nx - ARENA_CENTER[0], ny - ARENA_CENTER[1])
-                ring = RingOnlyAttack(neo_offset, ICE_RING_COLOR)
+                ring = RingOnlyAttack(neo_offset, ICE_RING_COLOR, is_fake)
                 self._attack_wrappers.append(_AttackWrapper(ring, t + duration))
             elif action in ('chaos_tsunami', 'chaos_entropy'):
                 is_fake = random.choice([True, False])
                 self._pending_actions.append((t + duration, action, is_fake))
                 cx, cy = self.enemies.chaos_center
                 chaos_offset = (cx - ARENA_CENTER[0], cy - ARENA_CENTER[1])
-                ring = RingOnlyAttack(chaos_offset, ICE_RING_COLOR)
+                ring = RingOnlyAttack(chaos_offset, ICE_RING_COLOR, is_fake)
                 self._attack_wrappers.append(_AttackWrapper(ring, t + duration))
 
     def _fire_pending_actions(self):
@@ -226,6 +228,7 @@ class Game:
         self._active_casts = {}
         self._attack_wrappers = []
         self._pending_actions = []
+        self.macro_output.clear()
 
     def update(self, dt, keys, events, arena_offset=(0, 0)):
         for event in events:
@@ -238,6 +241,8 @@ class Game:
 
         self.enemy_list.update(events, self.hud_locked, arena_offset)
         self.party_list.update(events, self.hud_locked, arena_offset)
+        self.macro_output.update(events, self.hud_locked, arena_offset)
+        self.macro_buttons.update(events, self.hud_locked, arena_offset)
 
         if self.state == GameState.GAME_OVER:
             return
@@ -310,6 +315,8 @@ class Game:
         self.enemy_list.render(surface, self._build_active_casts_hud(),
                                self.hud_locked, arena_offset)
         self.party_list.render(surface, self.hud_locked, self._members, arena_offset)
+        self.macro_output.render(surface, self.hud_locked, arena_offset)
+        self.macro_buttons.render(surface, self.hud_locked, arena_offset)
 
         if self.state == GameState.GAME_OVER:
             self._render_game_over(surface, arena_offset)

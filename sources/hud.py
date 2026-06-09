@@ -116,7 +116,7 @@ class PartyList:
     _DEBUFF_GAP = 2        # gap between debuff icons
     _PLAYER_ROW_COLOR = (255, 255, 255, 30)
 
-    def __init__(self, roles, player_role):
+    def __init__(self, roles, player_role, chaos_left):
         self._roles = roles
         self._player_role = player_role
         self._role_icons = {}
@@ -124,7 +124,7 @@ class PartyList:
             img = pygame.image.load(os.path.join(_ASSETS, f'{role}.png')).convert_alpha()
             self._role_icons[role] = pygame.transform.smoothscale(img, (self._ROLE_ICON_SIZE, self._ROLE_ICON_SIZE))
         h = len(roles) * PARTY_LIST_ROW_H + 2 * self._PAD
-        x = -PARTY_LIST_WIDTH - 310
+        x = chaos_left - 8 - PARTY_LIST_WIDTH
         y = ARENA_CENTER[1] - h // 2
         self.rect = pygame.Rect(x, y, PARTY_LIST_WIDTH, h)
         self._is_dragging = False
@@ -192,3 +192,169 @@ class PartyList:
                     dur_x = debuff_x + (ICON_W - dur_surf.get_width()) // 2
                     surface.blit(dur_surf, (dur_x, dy + ICON_H + 2))
                 debuff_x += ICON_W + self._DEBUFF_GAP
+
+
+_MACRO_BUTTONS = [
+    ('button_fire.png',      'Fire: TWISTER'),
+    ('button_fake.png',      'Fire: DONUT'),
+    ('button_water.png',     'Water: DONUT'),
+    ('button_fake.png',      'Water: TWISTER'),
+    ('button_spread.png',    'SPREAD'),
+    ('button_stack.png',     'STACK'),
+    ('button_gaze.png',      'Gaze: REAL'),
+    ('button_fake.png',      'Gaze: FAKE'),
+    ('button_stillness.png', 'STILLNESS'),
+    ('button_fake.png',      'MOTION'),
+]
+
+
+class MacroOutput:
+    _W = 200
+    _H = 350
+    _PAD = 6
+    _LINE_GAP = 2
+    _CLEAR_BTN_W = 50
+    _CLEAR_BTN_H = 22
+
+    def __init__(self, enemy_list):
+        x = enemy_list.rect.x
+        y = enemy_list.rect.bottom + 8
+        self.rect = pygame.Rect(x, y, self._W, self._H)
+        self._lines = []
+        self._scroll_offset = 0
+        self._font = _make_font(FONT_NAME, FONT_SIZE_NORMAL)
+        self._line_h = self._font.get_height() + self._LINE_GAP
+        self._bg_locked = _make_bg(self._W, self._H, locked=True)
+        self._bg_unlocked = _make_bg(self._W, self._H, locked=False)
+        self._is_dragging = False
+        self._drag_offset = (0, 0)
+
+    def add_line(self, text):
+        self._lines.append(text)
+        self._scroll_offset = self._max_scroll()
+
+    def clear(self):
+        self._lines.clear()
+        self._scroll_offset = 0
+
+    def _text_h(self):
+        return self._H - 2 * self._PAD - self._CLEAR_BTN_H - 4
+
+    def _max_scroll(self):
+        return max(0, len(self._lines) * self._line_h - self._text_h())
+
+    def update(self, events, locked, arena_offset=(0, 0)):
+        ox, oy = arena_offset
+        screen_rect = self.rect.move(ox, oy)
+        clear_rect = pygame.Rect(
+            screen_rect.right - self._PAD - self._CLEAR_BTN_W,
+            screen_rect.bottom - self._PAD - self._CLEAR_BTN_H,
+            self._CLEAR_BTN_W, self._CLEAR_BTN_H,
+        )
+        for event in events:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if clear_rect.collidepoint(event.pos):
+                    self._lines.clear()
+                    self._scroll_offset = 0
+                elif screen_rect.collidepoint(event.pos) and not locked:
+                    self._is_dragging = True
+                    self._drag_offset = (event.pos[0] - screen_rect.x,
+                                         event.pos[1] - screen_rect.y)
+            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                self._is_dragging = False
+            elif event.type == pygame.MOUSEMOTION and self._is_dragging:
+                self.rect.x = event.pos[0] - self._drag_offset[0] - ox
+                self.rect.y = event.pos[1] - self._drag_offset[1] - oy
+            elif event.type == pygame.MOUSEWHEEL:
+                if screen_rect.collidepoint(pygame.mouse.get_pos()):
+                    self._scroll_offset = max(0, min(
+                        self._max_scroll(),
+                        self._scroll_offset - event.y * self._line_h,
+                    ))
+
+    def render(self, surface, locked, arena_offset=(0, 0)):
+        ox, oy = arena_offset
+        screen_rect = self.rect.move(ox, oy)
+        surface.blit(self._bg_locked if locked else self._bg_unlocked, screen_rect.topleft)
+
+        text_area = pygame.Rect(
+            screen_rect.x + self._PAD,
+            screen_rect.y + self._PAD,
+            self._W - 2 * self._PAD,
+            self._text_h(),
+        )
+        old_clip = surface.get_clip()
+        surface.set_clip(text_area)
+        for i, line in enumerate(self._lines):
+            y = text_area.y + i * self._line_h - self._scroll_offset
+            if y + self._line_h <= text_area.y:
+                continue
+            if y >= text_area.bottom:
+                break
+            surface.blit(self._font.render(line, True, (255, 255, 255)), (text_area.x, y))
+        surface.set_clip(old_clip)
+
+        clear_rect = pygame.Rect(
+            screen_rect.right - self._PAD - self._CLEAR_BTN_W,
+            screen_rect.bottom - self._PAD - self._CLEAR_BTN_H,
+            self._CLEAR_BTN_W, self._CLEAR_BTN_H,
+        )
+        pygame.draw.rect(surface, (60, 60, 60), clear_rect)
+        pygame.draw.rect(surface, (150, 150, 150), clear_rect, 1)
+        clear_label = self._font.render('Clear', True, (255, 255, 255))
+        surface.blit(clear_label, clear_label.get_rect(center=clear_rect.center))
+
+
+class MacroButtons:
+    _BTN_SIZE = 38
+    _BTN_MARGIN = 4
+    _PAD = 4
+    _COLS = 2
+    _ROWS = 5
+
+    def __init__(self, macro_output):
+        self._macro_output = macro_output
+        w = 2 * self._PAD + self._COLS * self._BTN_SIZE + (self._COLS - 1) * self._BTN_MARGIN
+        h = 2 * self._PAD + self._ROWS * self._BTN_SIZE + (self._ROWS - 1) * self._BTN_MARGIN
+        self.rect = pygame.Rect(macro_output.rect.right + 8, macro_output.rect.y, w, h)
+        self._is_dragging = False
+        self._drag_offset = (0, 0)
+        self._bg_locked = _make_bg(w, h, locked=True)
+        self._bg_unlocked = _make_bg(w, h, locked=False)
+        self._buttons = []
+        for i, (fname, output) in enumerate(_MACRO_BUTTONS):
+            col = i % self._COLS
+            row = i // self._COLS
+            bx = self._PAD + col * (self._BTN_SIZE + self._BTN_MARGIN)
+            by = self._PAD + row * (self._BTN_SIZE + self._BTN_MARGIN)
+            img = pygame.image.load(os.path.join(_ASSETS, fname)).convert_alpha()
+            img = pygame.transform.smoothscale(img, (self._BTN_SIZE, self._BTN_SIZE))
+            self._buttons.append((img, pygame.Rect(bx, by, self._BTN_SIZE, self._BTN_SIZE), output))
+
+    def update(self, events, locked, arena_offset=(0, 0)):
+        ox, oy = arena_offset
+        screen_rect = self.rect.move(ox, oy)
+        for event in events:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                clicked_btn = False
+                for _, local_rect, output in self._buttons:
+                    if local_rect.move(screen_rect.x, screen_rect.y).collidepoint(event.pos):
+                        self._macro_output.add_line(output)
+                        clicked_btn = True
+                        break
+                if not clicked_btn and not locked and screen_rect.collidepoint(event.pos):
+                    self._is_dragging = True
+                    self._drag_offset = (event.pos[0] - screen_rect.x,
+                                         event.pos[1] - screen_rect.y)
+            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                self._is_dragging = False
+            elif event.type == pygame.MOUSEMOTION and self._is_dragging:
+                self.rect.x = event.pos[0] - self._drag_offset[0] - ox
+                self.rect.y = event.pos[1] - self._drag_offset[1] - oy
+
+    def render(self, surface, locked, arena_offset=(0, 0)):
+        ox, oy = arena_offset
+        screen_rect = self.rect.move(ox, oy)
+        surface.blit(self._bg_locked if locked else self._bg_unlocked, screen_rect.topleft)
+        for img, local_rect, _ in self._buttons:
+            surface.blit(img, local_rect.move(screen_rect.x, screen_rect.y).topleft)
