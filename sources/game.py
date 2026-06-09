@@ -105,6 +105,8 @@ class Game:
         self._active_casts = {}   # caster_name → _ActiveCast
         self._attack_wrappers = []
         self._pending_actions = []  # (trigger_time, action_type, is_fake)
+        self._chaos_queue = None
+        self._chaos_cast_count = 0
         self._add_correction = 0.0
         self._player_allagan_original_wound = None
         self._player_beyond_death_original_wound = None
@@ -166,13 +168,21 @@ class Game:
                 ring = RingOnlyAttack(neo_offset, ICE_RING_COLOR, is_fake)
                 self._attack_wrappers.append(_AttackWrapper(ring, t + duration))
             elif action in ('chaos_tsunami', 'chaos_entropy'):
+                if self._chaos_queue is None:
+                    self._chaos_queue = ['chaos_tsunami', 'chaos_entropy']
+                    random.shuffle(self._chaos_queue)
+                actual_action = self._chaos_queue.pop(0)
+                actual_cast_name = 'Tsunami' if actual_action == 'chaos_tsunami' else 'Inferno'
+                self._active_casts[caster] = _ActiveCast(actual_cast_name, duration)
+                # first cast gets 84s debuffs, second gets 45s — bait fires 5s before expiry
+                debuff_dur = 84.0 if len(self._chaos_queue) == 1 else 45.0
+                bait_offset = debuff_dur - 5.0
                 is_fake = random.choice([True, False])
-                self._pending_actions.append((t + duration, action, is_fake))
-                if action == 'chaos_entropy':
-                    self._pending_actions.append((t + duration + 40.0, 'entropy_bait', None))
-                elif action == 'chaos_tsunami':
-                    # 5s before dynamic fluid expires, bots move to center to bait
-                    self._pending_actions.append((t + duration + 79.0, 'df_bait', None))
+                self._pending_actions.append((t + duration, actual_action, is_fake))
+                if actual_action == 'chaos_entropy':
+                    self._pending_actions.append((t + duration + bait_offset, 'entropy_bait', None))
+                elif actual_action == 'chaos_tsunami':
+                    self._pending_actions.append((t + duration + bait_offset, 'df_bait', None))
                 cx, cy = self.enemies.chaos_center
                 chaos_offset = (cx - ARENA_CENTER[0], cy - ARENA_CENTER[1])
                 ring = RingOnlyAttack(chaos_offset, ICE_RING_COLOR, is_fake)
@@ -328,15 +338,22 @@ class Game:
                         (d.debuff_type for d in player.debuffs if 'wound' in d.debuff_type), None)
 
         elif action == 'chaos_tsunami':
+            debuff_dur = 84.0 if self._chaos_cast_count == 0 else 45.0
+            self._chaos_cast_count += 1
             self._dynamic_fluid_is_fake = is_fake
             for r in (supports + dps):
-                self._add(r, Debuff('dynamic_fluid', 84.0, is_fake))
+                self._add(r, Debuff('dynamic_fluid', debuff_dur, is_fake))
+            if self._chaos_cast_count == 2:
+                self.enemies.hide_chaos()
 
         elif action == 'chaos_entropy':
+            debuff_dur = 84.0 if self._chaos_cast_count == 0 else 45.0
+            self._chaos_cast_count += 1
             self._entropy_is_fake = is_fake
             for r in (supports + dps):
-                self._add(r, Debuff('entropy', 45.0, is_fake))
-            self.enemies.hide_chaos()
+                self._add(r, Debuff('entropy', debuff_dur, is_fake))
+            if self._chaos_cast_count == 2:
+                self.enemies.hide_chaos()
 
         elif action == 'flood_of_naught':
             self.enemies.hide_neo()
@@ -560,6 +577,8 @@ class Game:
         self._active_casts = {}
         self._attack_wrappers = []
         self._pending_actions = []
+        self._chaos_queue = None
+        self._chaos_cast_count = 0
         self._player_allagan_original_wound = None
         self._player_beyond_death_original_wound = None
         self._thrumming_thunder_attack = None
