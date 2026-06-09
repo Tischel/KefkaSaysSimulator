@@ -3,14 +3,16 @@ import os
 import random
 import pygame
 from constants import (
-    ARENA_CENTER,
+    ARENA_CENTER, ARENA_RADIUS,
     LIGHTNING_COLOR, LIGHTNING_TELEGRAPH_COLOR, LIGHTNING_RECT_W, LIGHTNING_RECT_H,
     LIGHTNING_RING_OFFSET, LIGHTNING_RING_COLOR,
     ICE_COLOR, ICE_TELEGRAPH_COLOR, ICE_RECT_SIZE,
     ICE_RING_OFFSET, ICE_RING_COLOR,
     TELEGRAPH_RING_W, TELEGRAPH_RING_H, TELEGRAPH_RING_LINE_W, ORB_REVOLUTION_TIME,
     TELEGRAPH_BORDER_COLOR, TELEGRAPH_BORDER_WIDTH,
+    WHITE_ANTILIGHT_COLOR, BLACK_ANTILIGHT_COLOR, ANTILIGHT_H, ANTILIGHT_TELEGRAPH_SIZE,
 )
+from debuff import Debuff
 
 _ASSETS = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'assets'))
 _orb_real = None
@@ -195,3 +197,58 @@ class RingOnlyAttack:
 
     def is_hit(self, point):
         return False
+
+
+class AntilightAttack:
+    def __init__(self, wound_type, side, neo_rect, is_fake=False):
+        # wound_type: 'white' or 'black'
+        # side: 'west' or 'east' — where the telegraph appears and where it hits when real
+        self.wound_type = wound_type
+        self.side = side
+        self.is_fake = is_fake
+        self._neo_rect = neo_rect
+        icon = 'white_wound_5541.png' if wound_type == 'white' else 'black_wound_5542.png'
+        img = pygame.image.load(os.path.join(_ASSETS, icon)).convert_alpha()
+        self._telegraph_img = pygame.transform.smoothscale(img, ANTILIGHT_TELEGRAPH_SIZE)
+        self._color = WHITE_ANTILIGHT_COLOR if wound_type == 'white' else BLACK_ANTILIGHT_COLOR
+
+    def _hit_side(self):
+        if self.is_fake:
+            return 'east' if self.side == 'west' else 'west'
+        return self.side
+
+    def update(self, dt):
+        pass
+
+    def render(self, surface, telegraphing, alpha, offset=(0, 0)):
+        if telegraphing:
+            return  # telegraph is the image drawn unmasked via render_ring
+        ox, oy = offset
+        hit_side = self._hit_side()
+        x = (ARENA_CENTER[0] - ARENA_RADIUS + ox) if hit_side == 'west' else (ARENA_CENTER[0] + ox)
+        y = ARENA_CENTER[1] - ANTILIGHT_H // 2 + oy
+        surf = pygame.Surface((ARENA_RADIUS, ANTILIGHT_H), pygame.SRCALPHA)
+        surf.fill((*self._color, alpha))
+        surface.blit(surf, (x, y))
+
+    def render_ring(self, surface, offset=(0, 0)):
+        ox, oy = offset
+        neo = self._neo_rect.move(ox, oy)
+        iw, ih = ANTILIGHT_TELEGRAPH_SIZE
+        img_x = (neo.left - iw) if self.side == 'west' else neo.right
+        img_y = neo.centery - ih // 2
+        surface.blit(self._telegraph_img, (img_x, img_y))
+
+    def is_hit(self, point):
+        return point[0] < ARENA_CENTER[0] if self._hit_side() == 'west' else point[0] >= ARENA_CENTER[0]
+
+    def apply_hit_effect(self, members):
+        swap_from = 'black_wound' if self.wound_type == 'white' else 'white_wound'
+        swap_to   = 'white_wound' if self.wound_type == 'white' else 'black_wound'
+        for member in members.values():
+            if not self.is_hit((member.position.x, member.position.y)):
+                continue
+            if any(d.debuff_type == swap_from for d in member.debuffs):
+                member.debuffs = [d for d in member.debuffs if d.debuff_type != swap_from]
+                member.debuffs.append(Debuff(swap_to, None))
+                member.debuffs.sort(key=lambda d: d.sort_order)

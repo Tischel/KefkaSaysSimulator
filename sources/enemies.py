@@ -18,6 +18,8 @@ class Enemies:
             bottom=ARENA_CENTER[1] - ARENA_RADIUS,
             centerx=ARENA_CENTER[0],
         ))
+        self._chaos_visible = True
+        self._neo_visible = True
 
     @property
     def chaos_rect(self):
@@ -28,10 +30,28 @@ class Enemies:
         return self._chaos[1].center
 
     @property
+    def neo_rect(self):
+        return self._neo[1]
+
+    @property
     def neo_center(self):
         return self._neo[1].center
 
+    def hide_chaos(self):
+        self._chaos_visible = False
+
+    def hide_neo(self):
+        self._neo_visible = False
+
+    def reset(self):
+        self._chaos_visible = True
+        self._neo_visible = True
+
     def render(self, surface, offset=(0, 0)):
         ox, oy = offset
-        for img, rect in (self._chaos, self._neo):
-            surface.blit(img, rect.move(ox, oy))
+        for img, rect, visible in (
+            (self._chaos[0], self._chaos[1], self._chaos_visible),
+            (self._neo[0],   self._neo[1],   self._neo_visible),
+        ):
+            if visible:
+                surface.blit(img, rect.move(ox, oy))

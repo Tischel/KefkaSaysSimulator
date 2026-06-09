@@ -11,7 +11,7 @@ from constants import (
 )
 from arena import Arena
 from player import Player
-from attacks import LightningAttack, IceAttack, RingOnlyAttack
+from attacks import LightningAttack, IceAttack, RingOnlyAttack, AntilightAttack
 from bot import Bot, circle_positions, CIRCLE_ORDER
 from debuff import Debuff
 from enemies import Enemies
@@ -131,6 +131,20 @@ class Game:
                 chaos_offset = (cx - ARENA_CENTER[0], cy - ARENA_CENTER[1])
                 ring = RingOnlyAttack(chaos_offset, ICE_RING_COLOR, is_fake)
                 self._attack_wrappers.append(_AttackWrapper(ring, t + duration))
+            elif action == 'flood_of_naught':
+                is_fake = random.choice([True, False])
+                self._pending_actions.append((t + duration, action, is_fake))
+                nx, ny = self.enemies.neo_center
+                neo_offset = (nx - ARENA_CENTER[0], ny - ARENA_CENTER[1])
+                ring = RingOnlyAttack(neo_offset, ICE_RING_COLOR, is_fake)
+                self._attack_wrappers.append(_AttackWrapper(ring, t + duration))
+                neo_rect = self.enemies.neo_rect
+                sides = ['west', 'east']
+                random.shuffle(sides)
+                self._attack_wrappers.append(_AttackWrapper(
+                    AntilightAttack('white', sides[0], neo_rect, is_fake), t + duration))
+                self._attack_wrappers.append(_AttackWrapper(
+                    AntilightAttack('black', sides[1], neo_rect, is_fake), t + duration))
 
     def _fire_pending_actions(self):
         remaining = []
@@ -201,6 +215,10 @@ class Game:
         elif action == 'chaos_entropy':
             for r in (supports + dps):
                 self._add(r, Debuff('entropy', 45.0, is_fake))
+            self.enemies.hide_chaos()
+
+        elif action == 'flood_of_naught':
+            self.enemies.hide_neo()
 
     def _add(self, role, debuff):
         member = self._members.get(role)
@@ -228,6 +246,7 @@ class Game:
         self._active_casts = {}
         self._attack_wrappers = []
         self._pending_actions = []
+        self.enemies.reset()
         self.macro_output.clear()
 
     def update(self, dt, keys, events, arena_offset=(0, 0)):
@@ -262,7 +281,9 @@ class Game:
             w.update(dt, self._elapsed)
             if not w.triggered and self._elapsed >= w.trigger_time:
                 w.triggered = True
-                if w.attack.is_hit(self.player.get_center()):
+                if hasattr(w.attack, 'apply_hit_effect'):
+                    w.attack.apply_hit_effect(self._members)
+                elif w.attack.is_hit(self.player.get_center()):
                     self.player_was_hit = True
                     self.state = GameState.GAME_OVER
         self._attack_wrappers = [w for w in self._attack_wrappers if not w.is_done]

@@ -31,6 +31,11 @@ LIGHTNING_RING_COLOR = (224, 185, 255)
 ICE_RING_OFFSET = (0, -20)
 ICE_RING_COLOR = (185, 211, 255)
 
+WHITE_ANTILIGHT_COLOR = (107, 57, 189)
+BLACK_ANTILIGHT_COLOR = (2, 38, 255)
+ANTILIGHT_H = 798
+ANTILIGHT_TELEGRAPH_SIZE = (48, 64)
+
 ATTACK_ALPHA_START = 191
 TELEGRAPH_DURATION = 5.0
 ATTACK_DURATION = 2.0
@@ -60,8 +65,10 @@ TIMELINE = [
     (24.518, 'Kefka',       'Mystery Magic',  5.0, 'mystery_magic'),
     (24.920, 'Neo Exdeath', 'Grand Cross',    9.0, 'neo_debuffs_2'),
     (30.012, 'Chaos',       'Inferno',        9.0, 'chaos_entropy'),
-    (39.655, 'Kefka',       'Mystery Magic',  5.0, 'mystery_magic'),
-    (39.877, 'Neo Exdeath', 'Grand Cross',    9.0, 'neo_debuffs_3'),
+    (39.655, 'Kefka',       'Mystery Magic',    5.0, 'mystery_magic'),
+    (39.877, 'Neo Exdeath', 'Grand Cross',      9.0, 'neo_debuffs_3'),
+    (56.023, 'Neo Exdeath', 'Flood of Naught',  5.0, 'flood_of_naught'),
+    (66.768, 'Kefka',       'Mana Charge',      3.0, None),
 ]
 ROLE_NAMES = {
     'T1': 'Tank 1',
