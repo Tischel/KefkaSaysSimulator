@@ -11,6 +11,7 @@ from constants import (
     TELEGRAPH_RING_W, TELEGRAPH_RING_H, TELEGRAPH_RING_LINE_W, ORB_REVOLUTION_TIME,
     TELEGRAPH_BORDER_COLOR, TELEGRAPH_BORDER_WIDTH,
     WHITE_ANTILIGHT_COLOR, BLACK_ANTILIGHT_COLOR, ANTILIGHT_H, ANTILIGHT_TELEGRAPH_SIZE,
+    ANTILIGHT_TELEGRAPH_GAP,
 )
 from debuff import Debuff
 
@@ -235,7 +236,7 @@ class AntilightAttack:
         ox, oy = offset
         neo = self._neo_rect.move(ox, oy)
         iw, ih = ANTILIGHT_TELEGRAPH_SIZE
-        img_x = (neo.left - iw) if self.side == 'west' else neo.right
+        img_x = (neo.left - iw - ANTILIGHT_TELEGRAPH_GAP) if self.side == 'west' else (neo.right + ANTILIGHT_TELEGRAPH_GAP)
         img_y = neo.centery - ih // 2
         surface.blit(self._telegraph_img, (img_x, img_y))
 

@@ -35,6 +35,7 @@ WHITE_ANTILIGHT_COLOR = (107, 57, 189)
 BLACK_ANTILIGHT_COLOR = (2, 38, 255)
 ANTILIGHT_H = 798
 ANTILIGHT_TELEGRAPH_SIZE = (48, 64)
+ANTILIGHT_TELEGRAPH_GAP  = 24
 
 ATTACK_ALPHA_START = 191
 TELEGRAPH_DURATION = 5.0
@@ -102,6 +103,28 @@ FONT_SIZE_SMALL = 14
 #   ice_pair_idx:       0 = NW+SE quadrants are dangerous
 #                       1 = NE+SW quadrants are dangerous
 # Value: (x, y) in game-space coordinates (arena center = 400, 400)
+BOT_SUPPORTS_SPREAD = (-200, 0)
+BOT_DPS_SPREAD      = (200, 0)
+BOT_SUPPORTS_STACK  = (0, -150)
+BOT_DPS_STACK       = (0, 150)
+
+# Key: (tt_angle, tt_effective_pair_idx, shriek_is_fake)
+# Value: dict with positions for each group that must satisfy both TT safety and gaze
+#   support_shriek: Support bot with Cursed Shriek
+#   dps_shriek:     DPS bot with Cursed Shriek
+#   tank:           non-Shriek Tank bots
+#   party:          non-Shriek non-Tank bots
+TT_GAZE_SPOTS = {
+    ( 45, 0, False): {'support_shriek': (-40, 100), 'dps_shriek': (40, 100), 'tank': (-100, 40), 'party': (-100, -40)},
+    ( 45, 0, True):  {'support_shriek': (-100, -40), 'dps_shriek': (40, 100), 'tank': (180, -180), 'party': (0, 200)},
+    ( 45, 1, False): {'support_shriek': (-180, 180), 'dps_shriek': (100, 40), 'tank': (0, -80), 'party': (0, -80)},
+    ( 45, 1, True):  {'support_shriek': (-40, -100), 'dps_shriek': (100, 40), 'tank': (0, -200), 'party': (0, -200)},
+    (-45, 0, False): {'support_shriek': (-100, 40), 'dps_shriek': (180, 180), 'tank': (0, -80), 'party': (0, -80)},
+    (-45, 0, True):  {'support_shriek': (-100, 40), 'dps_shriek': (40, -100), 'tank': (0, -200), 'party': (0, -200)},
+    (-45, 1, False): {'support_shriek': (-40, 100), 'dps_shriek': (40, 100), 'tank': (100, -40), 'party': (100, -40)},
+    (-45, 1, True):  {'support_shriek': (-40, 100), 'dps_shriek': (100, -40), 'tank': (0, 200), 'party': (0, 200)},
+}
+
 SAFE_SPOTS = {
     ( 45, 0, 0): (-80, 80),  # +45° pair A | Ice NW+SE
     ( 45, 0, 1): [(40, 100), (-100, -40)],  # +45° pair A | Ice NE+SW

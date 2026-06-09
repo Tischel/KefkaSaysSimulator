@@ -10,14 +10,18 @@ class Player:
         self.role = role
         self._icon = pygame.image.load(os.path.join(_ASSETS, f'{role}.png')).convert_alpha()
         self.position = pygame.Vector2(start_pos if start_pos is not None else ARENA_CENTER)
+        self._facing = pygame.Vector2(0, -1)  # north by default
+        self._is_moving = False
         self.debuffs = []
 
     def update(self, dt, keys):
         dx = (keys[pygame.K_d] or keys[pygame.K_RIGHT]) - (keys[pygame.K_a] or keys[pygame.K_LEFT])
         dy = (keys[pygame.K_s] or keys[pygame.K_DOWN]) - (keys[pygame.K_w] or keys[pygame.K_UP])
         velocity = pygame.Vector2(dx, dy)
-        if velocity.length_squared() > 0:
+        self._is_moving = velocity.length_squared() > 0
+        if self._is_moving:
             velocity.normalize_ip()
+            self._facing = pygame.Vector2(velocity)
         self.position += velocity * PLAYER_SPEED * dt
 
         center = pygame.Vector2(ARENA_CENTER)

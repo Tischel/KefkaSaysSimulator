@@ -187,7 +187,7 @@ class PartyList:
                 self.rect.x = event.pos[0] - self._drag_offset[0] - ox
                 self.rect.y = event.pos[1] - self._drag_offset[1] - oy
 
-    def render(self, surface, locked, members, arena_offset=(0, 0)):
+    def render(self, surface, locked, members, arena_offset=(0, 0), debug_mode=False):
         # members: dict of {role: player_or_bot}
         ox, oy = arena_offset
         screen_rect = self.rect.move(ox, oy)
@@ -224,7 +224,8 @@ class PartyList:
                 surface.blit(icon_surf, (debuff_x, dy))
                 dur_text = debuff.duration_text
                 if dur_text:
-                    dur_surf = self._dur_font.render(dur_text, True, (255, 255, 255))
+                    dur_color = (255, 60, 60) if (debug_mode and debuff.is_fake) else (255, 255, 255)
+                    dur_surf = self._dur_font.render(dur_text, True, dur_color)
                     dur_x = debuff_x + (ICON_W - dur_surf.get_width()) // 2
                     surface.blit(dur_surf, (dur_x, dy + ICON_H + 2))
                 if pygame.Rect(debuff_x, dy, ICON_W, ICON_H).collidepoint(mouse_pos):
