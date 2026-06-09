@@ -84,6 +84,35 @@ class EnemyList:
                                  (bar_section_x, bar_y, int(bar_w * cast['progress']), bar_h))
 
 
+class Timer:
+    _W = 100
+    _H = 28
+
+    def __init__(self, enemy_list):
+        x = enemy_list.rect.centerx - self._W // 2
+        y = enemy_list.rect.top - self._H - 4
+        self.rect = pygame.Rect(x, y, self._W, self._H)
+        self._elapsed = 0.0
+        self._font = _make_font(FONT_NAME, FONT_SIZE_SMALL + 4)
+        self._bg = _make_bg(self._W, self._H, locked=True)
+
+    def reset(self):
+        self._elapsed = 0.0
+
+    def update(self, dt, paused=False):
+        if not paused:
+            self._elapsed += dt
+
+    def render(self, surface, arena_offset=(0, 0)):
+        ox, oy = arena_offset
+        screen_rect = self.rect.move(ox, oy)
+        surface.blit(self._bg, screen_rect.topleft)
+        total_secs = int(self._elapsed)
+        text = f"{total_secs // 60}:{total_secs % 60:02d}"
+        text_surf = self._font.render(text, True, (255, 255, 255))
+        surface.blit(text_surf, text_surf.get_rect(center=screen_rect.center))
+
+
 class FpsCounter:
     def __init__(self):
         self._font = _make_font(FONT_NAME, FONT_SIZE_SMALL)

@@ -15,7 +15,7 @@ from attacks import LightningAttack, IceAttack, RingOnlyAttack, AntilightAttack
 from bot import Bot, circle_positions, CIRCLE_ORDER
 from debuff import Debuff
 from enemies import Enemies
-from hud import EnemyList, PartyList, MacroOutput, MacroButtons, _make_font
+from hud import EnemyList, PartyList, MacroOutput, MacroButtons, Timer, _make_font
 
 
 class GameState(Enum):
@@ -81,6 +81,7 @@ class Game:
         self.party_list = PartyList(PARTY_LIST_ORDER, role, self.enemies.chaos_rect.left)
         self.macro_output = MacroOutput(self.enemy_list)
         self.macro_buttons = MacroButtons(self.macro_output)
+        self.timer = Timer(self.enemy_list)
         self.state = GameState.RUNNING
         self.player_was_hit = False
         self._font_large = _make_font(FONT_NAME, FONT_SIZE_LARGE)
@@ -318,6 +319,7 @@ class Game:
         self._mana_release_ice = None
         self.enemies.reset()
         self.macro_output.clear()
+        self.timer.reset()
 
     def update(self, dt, keys, events, arena_offset=(0, 0)):
         for event in events:
@@ -332,6 +334,7 @@ class Game:
         self.party_list.update(events, self.hud_locked, arena_offset)
         self.macro_output.update(events, self.hud_locked, arena_offset)
         self.macro_buttons.update(events, self.hud_locked, arena_offset)
+        self.timer.update(dt, paused=(self.state == GameState.GAME_OVER))
 
         if self.state == GameState.GAME_OVER:
             return
@@ -411,6 +414,7 @@ class Game:
         self.party_list.render(surface, self.hud_locked, self._members, arena_offset)
         self.macro_output.render(surface, self.hud_locked, arena_offset)
         self.macro_buttons.render(surface, self.hud_locked, arena_offset)
+        self.timer.render(surface, arena_offset)
 
         if self.state == GameState.GAME_OVER:
             self._render_game_over(surface, arena_offset)
