@@ -30,6 +30,7 @@ LIGHTNING_RING_COLOR = (224, 185, 255)
 
 ICE_RING_OFFSET = (0, -20)
 ICE_RING_COLOR = (185, 211, 255)
+
 ATTACK_ALPHA_START = 191
 TELEGRAPH_DURATION = 5.0
 ATTACK_DURATION = 2.0
@@ -39,8 +40,39 @@ COOLDOWN_DURATION = 4.0
 
 PLAYER_SPEED = 196
 
-ENEMY_LIST_WIDTH = 200
-ENEMY_LIST_HEIGHT = 110
+ENEMY_LIST_WIDTH = 300
+ENEMY_LIST_ROW_H = 46
+ENEMY_LIST_HEIGHT = 3 * 46 + 16  # 3 rows + top/bottom padding
+
+PARTY_LIST_WIDTH = 290
+PARTY_LIST_ROW_H = 52
+PARTY_LIST_ORDER = ['T1', 'T2', 'H1', 'H2', 'M1', 'M2', 'R1', 'R2']
+
+SUPPORTS = ['T1', 'T2', 'H1', 'H2']
+DPS = ['M1', 'M2', 'R1', 'R2']
+
+# (start_time_secs, caster, display_name, cast_duration_secs, action_type)
+TIMELINE = [
+    ( 0.000, 'Kefka',       'Kefka Says',    5.0, None),
+    ( 9.588, 'Kefka',       'Mystery Magic',  5.0, 'mystery_magic'),
+    ( 9.989, 'Neo Exdeath', 'Grand Cross',    9.0, 'neo_debuffs_1'),
+    (15.079, 'Chaos',       'Tsunami',        9.0, 'chaos_tsunami'),
+    (24.518, 'Kefka',       'Mystery Magic',  5.0, 'mystery_magic'),
+    (24.920, 'Neo Exdeath', 'Grand Cross',    9.0, 'neo_debuffs_2'),
+    (30.012, 'Chaos',       'Inferno',        9.0, 'chaos_entropy'),
+    (39.655, 'Kefka',       'Mystery Magic',  5.0, 'mystery_magic'),
+    (39.877, 'Neo Exdeath', 'Grand Cross',    9.0, 'neo_debuffs_3'),
+]
+ROLE_NAMES = {
+    'T1': 'Tank 1',
+    'T2': 'Tank 2',
+    'H1': 'Healer 1',
+    'H2': 'Healer 2',
+    'M1': 'Melee 1',
+    'M2': 'Melee 2',
+    'R1': 'Ranged 1',
+    'R2': 'Ranged 2',
+}
 
 CAST_BAR_COLOR = (255, 255, 255)
 CAST_BAR_BG_COLOR = (51, 51, 51)

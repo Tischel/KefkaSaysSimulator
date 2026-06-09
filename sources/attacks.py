@@ -174,3 +174,23 @@ class IceAttack:
     def is_hit(self, point):
         rects = self._inverted_rects if self.is_fake else self.rects
         return any(r.collidepoint(point) for r in rects)
+
+
+class RingOnlyAttack:
+    def __init__(self, ring_offset, ring_color):
+        self._ring_center = (ARENA_CENTER[0] + ring_offset[0],
+                             ARENA_CENTER[1] + ring_offset[1])
+        self._ring_color = ring_color
+        self._ring_angle = 0.0
+
+    def update(self, dt):
+        self._ring_angle += (2 * math.pi / ORB_REVOLUTION_TIME) * dt
+
+    def render(self, surface, telegraphing, alpha, offset=(0, 0)):
+        pass
+
+    def render_ring(self, surface, offset=(0, 0)):
+        _draw_ring(surface, self._ring_center, self._ring_angle, self._ring_color, offset)
+
+    def is_hit(self, point):
+        return False

@@ -24,11 +24,13 @@ def circle_positions():
 
 class Bot:
     def __init__(self, role, start_pos):
+        self.role = role
         self._icon = pygame.image.load(os.path.join(_ASSETS, f'{role}.png')).convert_alpha()
         self._start_pos = pygame.Vector2(start_pos)
         self.position = pygame.Vector2(start_pos)
         self._destination = None
         self._moving = False
+        self.debuffs = []
 
     def set_destination(self, base_dest):
         angle = random.uniform(0, 2 * math.pi)
@@ -39,10 +41,19 @@ class Bot:
         )
         self._moving = False
 
+    def update_debuffs(self, dt):
+        for d in self.debuffs:
+            d.update(dt)
+        self.debuffs = sorted(
+            [d for d in self.debuffs if not d.is_expired],
+            key=lambda d: d.sort_order,
+        )
+
     def reset(self):
         self.position = pygame.Vector2(self._start_pos)
         self._destination = None
         self._moving = False
+        self.debuffs = []
 
     def update(self, dt, state_timer):
         if self._destination is None:
