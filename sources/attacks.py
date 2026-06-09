@@ -12,6 +12,8 @@ from constants import (
     TELEGRAPH_BORDER_COLOR, TELEGRAPH_BORDER_WIDTH,
     WHITE_ANTILIGHT_COLOR, BLACK_ANTILIGHT_COLOR, ANTILIGHT_H, ANTILIGHT_TELEGRAPH_SIZE,
     ANTILIGHT_TELEGRAPH_GAP,
+    ENTROPY_COLOR, ENTROPY_TELEGRAPH_COLOR, ENTROPY_RADIUS,
+    DYNAMIC_FLUID_COLOR, DYNAMIC_FLUID_TELEGRAPH_COLOR, DYNAMIC_FLUID_RADIUS,
 )
 from debuff import Debuff
 
@@ -253,3 +255,61 @@ class AntilightAttack:
                 member.debuffs = [d for d in member.debuffs if d.debuff_type != swap_from]
                 member.debuffs.append(Debuff(swap_to, None))
                 member.debuffs.sort(key=lambda d: d.sort_order)
+
+
+class EntropyAttack:
+    def __init__(self, center, is_fake=False):
+        self.center = pygame.Vector2(center)
+        self.is_fake = is_fake
+
+    def update(self, dt):
+        pass
+
+    def render(self, surface, telegraphing, alpha, offset=(0, 0)):
+        color = ENTROPY_TELEGRAPH_COLOR if telegraphing else ENTROPY_COLOR
+        ox, oy = offset
+        cx = int(self.center.x) + ox
+        cy = int(self.center.y) + oy
+        if self.is_fake:
+            surf = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+            surf.fill((*color, alpha))
+            pygame.draw.circle(surf, (0, 0, 0, 0), (cx, cy), ENTROPY_RADIUS)
+            surface.blit(surf, (0, 0))
+        else:
+            pygame.draw.circle(surface, (*color, alpha), (cx, cy), ENTROPY_RADIUS)
+
+    def render_ring(self, surface, offset=(0, 0)):
+        pass
+
+    def is_hit(self, point):
+        dist = (pygame.Vector2(point) - self.center).length()
+        return dist > ENTROPY_RADIUS if self.is_fake else dist <= ENTROPY_RADIUS
+
+
+class DynamicFluidAttack:
+    def __init__(self, center, is_fake=False):
+        self.center = pygame.Vector2(center)
+        self.is_fake = is_fake
+
+    def update(self, dt):
+        pass
+
+    def render(self, surface, telegraphing, alpha, offset=(0, 0)):
+        color = DYNAMIC_FLUID_TELEGRAPH_COLOR if telegraphing else DYNAMIC_FLUID_COLOR
+        ox, oy = offset
+        cx = int(self.center.x) + ox
+        cy = int(self.center.y) + oy
+        if not self.is_fake:  # real = inverted: safe inside, fill outside
+            surf = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+            surf.fill((*color, alpha))
+            pygame.draw.circle(surf, (0, 0, 0, 0), (cx, cy), DYNAMIC_FLUID_RADIUS)
+            surface.blit(surf, (0, 0))
+        else:  # fake = filled circle: danger inside
+            pygame.draw.circle(surface, (*color, alpha), (cx, cy), DYNAMIC_FLUID_RADIUS)
+
+    def render_ring(self, surface, offset=(0, 0)):
+        pass
+
+    def is_hit(self, point):
+        dist = (pygame.Vector2(point) - self.center).length()
+        return dist > DYNAMIC_FLUID_RADIUS if not self.is_fake else dist <= DYNAMIC_FLUID_RADIUS

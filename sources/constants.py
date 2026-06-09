@@ -103,10 +103,27 @@ FONT_SIZE_SMALL = 14
 #   ice_pair_idx:       0 = NW+SE quadrants are dangerous
 #                       1 = NE+SW quadrants are dangerous
 # Value: (x, y) in game-space coordinates (arena center = 400, 400)
-BOT_SUPPORTS_SPREAD = (-200, 0)
-BOT_DPS_SPREAD      = (200, 0)
-BOT_SUPPORTS_STACK  = (0, -150)
-BOT_DPS_STACK       = (0, 150)
+BOT_SUPPORTS_SPREAD  = (-200, 0)
+BOT_DPS_SPREAD       = (200, 0)
+BOT_SUPPORTS_STACK   = (0, -150)
+BOT_DPS_STACK        = (0, 150)
+BOT_WATER_FIRE_BAIT  = (0, 0)
+
+BOT_SUPPORT_GAZE_REAL = (100, 100)
+BOT_DPS_GAZE_REAL     = (-100, -100)
+BOT_SUPPORT_GAZE_FAKE = (-50, 0)
+BOT_DPS_GAZE_FAKE     = (50, 0)
+BOT_PARTY_GAZE_REAL   = (0, 0)
+BOT_TANK_GAZE_FAKE    = (0, -150)
+BOT_PARTY_GAZE_FAKE   = (0, 150)
+
+ENTROPY_COLOR           = (0xff, 0x3c, 0x00)
+ENTROPY_TELEGRAPH_COLOR = (0xce, 0x5e, 0x3c)
+ENTROPY_RADIUS          = 150
+
+DYNAMIC_FLUID_COLOR           = (0x48, 0x73, 0xd5)
+DYNAMIC_FLUID_TELEGRAPH_COLOR = (0x00, 0x4e, 0xff)
+DYNAMIC_FLUID_RADIUS          = 150
 
 # Key: (tt_angle, tt_effective_pair_idx, shriek_is_fake)
 # Value: dict with positions for each group that must satisfy both TT safety and gaze

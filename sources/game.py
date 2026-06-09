@@ -10,11 +10,14 @@ from constants import (
     SAFE_SPOTS, PARTY_LIST_ORDER, SUPPORTS, DPS, TIMELINE,
     ICE_RING_COLOR,
     BOT_SUPPORTS_SPREAD, BOT_DPS_SPREAD, BOT_SUPPORTS_STACK, BOT_DPS_STACK,
+    BOT_WATER_FIRE_BAIT,
+    BOT_SUPPORT_GAZE_REAL, BOT_DPS_GAZE_REAL, BOT_SUPPORT_GAZE_FAKE, BOT_DPS_GAZE_FAKE,
+    BOT_PARTY_GAZE_REAL, BOT_TANK_GAZE_FAKE, BOT_PARTY_GAZE_FAKE,
     TT_GAZE_SPOTS,
 )
 from arena import Arena
 from player import Player
-from attacks import LightningAttack, IceAttack, RingOnlyAttack, AntilightAttack
+from attacks import LightningAttack, IceAttack, RingOnlyAttack, AntilightAttack, EntropyAttack, DynamicFluidAttack
 from bot import Bot, circle_positions, CIRCLE_ORDER
 from debuff import Debuff
 from enemies import Enemies
@@ -110,6 +113,10 @@ class Game:
         self._debuffs_1_fl_roles = set()
         self._debuffs_1_cw_roles = set()
         self._debuffs_1_cs_roles = set()
+        self._debuffs_2_fl_roles = set()
+        self._debuffs_2_cw_roles = set()
+        self._debuffs_2_cs_roles = set()
+        self._dynamic_fluid_is_fake = None
         self._loss_reason = ""
         self._fov_timer = 0.0
         self._fov_facing = pygame.Vector2(0, -1)
@@ -118,6 +125,8 @@ class Game:
         self._ab_window_end = 0.0
         self._ab_is_fake = False
         self._ab_violated = False
+        self._ab_stationary_dur = 0.0
+        self._entropy_is_fake = None
 
     # ------------------------------------------------------------------
     # Timeline
@@ -145,6 +154,10 @@ class Game:
             elif action in ('neo_debuffs_1', 'neo_debuffs_2', 'neo_debuffs_3'):
                 is_fake = random.choice([True, False])
                 self._pending_actions.append((t + duration, action, is_fake))
+                if action == 'neo_debuffs_2':
+                    # 6s before 2nd FL/CW expires; 5s before 2nd CS expires
+                    self._pending_actions.append((t + duration + 55.0, 'fl_cw_2_move', None))
+                    self._pending_actions.append((t + duration + 64.0, 'cs_2_gaze',    None))
                 nx, ny = self.enemies.neo_center
                 neo_offset = (nx - ARENA_CENTER[0], ny - ARENA_CENTER[1])
                 ring = RingOnlyAttack(neo_offset, ICE_RING_COLOR, is_fake)
@@ -152,6 +165,11 @@ class Game:
             elif action in ('chaos_tsunami', 'chaos_entropy'):
                 is_fake = random.choice([True, False])
                 self._pending_actions.append((t + duration, action, is_fake))
+                if action == 'chaos_entropy':
+                    self._pending_actions.append((t + duration + 40.0, 'entropy_bait', None))
+                elif action == 'chaos_tsunami':
+                    # 5s before dynamic fluid expires, bots move to center to bait
+                    self._pending_actions.append((t + duration + 79.0, 'df_bait', None))
                 cx, cy = self.enemies.chaos_center
                 chaos_offset = (cx - ARENA_CENTER[0], cy - ARENA_CENTER[1])
                 ring = RingOnlyAttack(chaos_offset, ICE_RING_COLOR, is_fake)
@@ -193,9 +211,16 @@ class Game:
                 # no lightning present — pick any lightning combo to look up an ice-safe spot
                 key = (random.choice([45, -45]), random.randint(0, 1), ice.effective_pair_idx)
                 spot = SAFE_SPOTS[key]
-                for bot in self.bots:
-                    s = random.choice(spot) if isinstance(spot, list) else spot
-                    bot.set_destination((ARENA_CENTER[0] + s[0], ARENA_CENTER[1] + s[1]))
+                fl_cw_2_roles = self._debuffs_2_fl_roles | self._debuffs_2_cw_roles
+                fl_cw_2_resolving = any(
+                    any(d.debuff_type in ('forked_lightning', 'compressed_water')
+                        for d in self._members[r].debuffs)
+                    for r in fl_cw_2_roles if r in self._members
+                )
+                if not fl_cw_2_resolving:
+                    for bot in self.bots:
+                        s = random.choice(spot) if isinstance(spot, list) else spot
+                        bot.set_destination((ARENA_CENTER[0] + s[0], ARENA_CENTER[1] + s[1]))
                 self._attack_wrappers.append(_AttackWrapper(ice, t + duration))
             elif action == 'mana_release':
                 shape_start = t + duration          # cast end: shapes appear
@@ -276,6 +301,9 @@ class Game:
             self._add(fl_cw_d[1], Debuff('acceleration_bomb', 61.0, is_fake))
             self._add(ab_d[0], Debuff('forked_lightning',  61.0, is_fake))
             self._add(ab_d[1], Debuff('compressed_water',  61.0, is_fake))
+            self._debuffs_2_fl_roles = {ab_s[0], ab_d[0]}
+            self._debuffs_2_cw_roles = {ab_s[1], ab_d[1]}
+            self._debuffs_2_cs_roles = {fl_cw[1], fl_cw_d[1]}
 
         elif action == 'neo_debuffs_3':
             random.shuffle(supports); random.shuffle(dps)
@@ -299,10 +327,12 @@ class Game:
                         (d.debuff_type for d in player.debuffs if 'wound' in d.debuff_type), None)
 
         elif action == 'chaos_tsunami':
+            self._dynamic_fluid_is_fake = is_fake
             for r in (supports + dps):
                 self._add(r, Debuff('dynamic_fluid', 84.0, is_fake))
 
         elif action == 'chaos_entropy':
+            self._entropy_is_fake = is_fake
             for r in (supports + dps):
                 self._add(r, Debuff('entropy', 45.0, is_fake))
             self.enemies.hide_chaos()
@@ -383,6 +413,97 @@ class Game:
                     force_move=True,
                 )
 
+        elif action == 'entropy_bait':
+            for bot in self.bots:
+                d = next((x for x in bot.debuffs if x.debuff_type == 'entropy'), None)
+                if d and d.remaining is not None and d.remaining > 0:
+                    bot.set_destination(
+                        (ARENA_CENTER[0] + BOT_WATER_FIRE_BAIT[0], ARENA_CENTER[1] + BOT_WATER_FIRE_BAIT[1]),
+                        time_to_hit=d.remaining,
+                        force_move=True,
+                    )
+
+        elif action == 'df_bait':
+            for bot in self.bots:
+                d = next((x for x in bot.debuffs if x.debuff_type == 'dynamic_fluid'), None)
+                if d and d.remaining is not None and d.remaining > 0:
+                    bot.set_destination(
+                        (ARENA_CENTER[0] + BOT_WATER_FIRE_BAIT[0], ARENA_CENTER[1] + BOT_WATER_FIRE_BAIT[1]),
+                        time_to_hit=d.remaining,
+                        force_move=True,
+                    )
+
+        elif action == 'fl_cw_2_move':
+            time_ref = 0.0
+            for bot in self.bots:
+                if bot.role in self._debuffs_2_fl_roles or bot.role in self._debuffs_2_cw_roles:
+                    d = next((x for x in bot.debuffs
+                              if x.debuff_type in ('forked_lightning', 'compressed_water')), None)
+                    if d:
+                        time_ref = d.remaining
+                        break
+            for bot in self.bots:
+                is_support = bot.role in SUPPORTS
+                if bot.role in self._debuffs_2_fl_roles:
+                    d = next((x for x in bot.debuffs if x.debuff_type == 'forked_lightning'), None)
+                    if d:
+                        spread = not d.is_fake
+                        offset = (BOT_SUPPORTS_SPREAD if is_support else BOT_DPS_SPREAD) if spread \
+                            else (BOT_SUPPORTS_STACK if is_support else BOT_DPS_STACK)
+                        bot.set_destination(
+                            (ARENA_CENTER[0] + offset[0], ARENA_CENTER[1] + offset[1]),
+                            time_to_hit=d.remaining, force_move=True,
+                        )
+                        continue
+                if bot.role in self._debuffs_2_cw_roles:
+                    d = next((x for x in bot.debuffs if x.debuff_type == 'compressed_water'), None)
+                    if d:
+                        spread = d.is_fake
+                        offset = (BOT_SUPPORTS_SPREAD if is_support else BOT_DPS_SPREAD) if spread \
+                            else (BOT_SUPPORTS_STACK if is_support else BOT_DPS_STACK)
+                        bot.set_destination(
+                            (ARENA_CENTER[0] + offset[0], ARENA_CENTER[1] + offset[1]),
+                            time_to_hit=d.remaining, force_move=True,
+                        )
+                        continue
+                offset = BOT_SUPPORTS_STACK if is_support else BOT_DPS_STACK
+                bot.set_destination(
+                    (ARENA_CENTER[0] + offset[0], ARENA_CENTER[1] + offset[1]),
+                    time_to_hit=time_ref, force_move=True,
+                )
+
+        elif action == 'cs_2_gaze':
+            if not self._debuffs_2_cs_roles:
+                return
+            cs_is_fake = None
+            cs_remaining = 0.0
+            for r in self._debuffs_2_cs_roles:
+                member = self._members.get(r)
+                if member:
+                    d = next((x for x in member.debuffs if x.debuff_type == 'cursed_shriek'), None)
+                    if d:
+                        cs_is_fake = d.is_fake
+                        cs_remaining = d.remaining
+                        break
+            if cs_is_fake is None:
+                return
+            support_cs = next((r for r in self._debuffs_2_cs_roles if r in SUPPORTS), None)
+            dps_cs     = next((r for r in self._debuffs_2_cs_roles if r in DPS),      None)
+            for bot in self.bots:
+                if bot.role == support_cs:
+                    dest = BOT_SUPPORT_GAZE_REAL if not cs_is_fake else BOT_SUPPORT_GAZE_FAKE
+                elif bot.role == dps_cs:
+                    dest = BOT_DPS_GAZE_REAL if not cs_is_fake else BOT_DPS_GAZE_FAKE
+                elif bot.role in ('T1', 'T2'):
+                    dest = BOT_PARTY_GAZE_REAL if not cs_is_fake else BOT_TANK_GAZE_FAKE
+                else:
+                    dest = BOT_PARTY_GAZE_REAL if not cs_is_fake else BOT_PARTY_GAZE_FAKE
+                bot.set_destination(
+                    (ARENA_CENTER[0] + dest[0], ARENA_CENTER[1] + dest[1]),
+                    time_to_hit=max(0.0, cs_remaining - 3.0),
+                    force_move=True,
+                )
+
         elif action == 'mana_release_hit':
             if self._mana_release_lightning and self._thrumming_thunder_attack:
                 final_fake = self._mana_release_lightning.is_fake != self._thrumming_thunder_attack.is_fake
@@ -437,6 +558,10 @@ class Game:
         self._debuffs_1_fl_roles = set()
         self._debuffs_1_cw_roles = set()
         self._debuffs_1_cs_roles = set()
+        self._debuffs_2_fl_roles = set()
+        self._debuffs_2_cw_roles = set()
+        self._debuffs_2_cs_roles = set()
+        self._dynamic_fluid_is_fake = None
         self._loss_reason = ""
         self._fov_timer = 0.0
         self._fov_facing = pygame.Vector2(0, -1)
@@ -445,6 +570,8 @@ class Game:
         self._ab_window_end = 0.0
         self._ab_is_fake = False
         self._ab_violated = False
+        self._ab_stationary_dur = 0.0
+        self._entropy_is_fake = None
         self.enemies.reset()
         self.macro_output.clear()
         self.timer.reset()
@@ -497,6 +624,16 @@ class Game:
                         self._loss_reason = "You were hit by Lightning."
                     elif isinstance(w.attack, IceAttack):
                         self._loss_reason = "You were hit by Ice."
+                    elif isinstance(w.attack, EntropyAttack):
+                        if w.attack.is_fake:
+                            self._loss_reason = "Fake Entropy: you were outside the safe zone."
+                        else:
+                            self._loss_reason = "Entropy: you were in the danger zone."
+                    elif isinstance(w.attack, DynamicFluidAttack):
+                        if w.attack.is_fake:
+                            self._loss_reason = "Fake Dynamic Fluid: you were in the danger zone."
+                        else:
+                            self._loss_reason = "Dynamic Fluid: you were outside the safe zone."
                     else:
                         self._loss_reason = "You were hit by an attack."
                     self.state = GameState.GAME_OVER
@@ -510,20 +647,29 @@ class Game:
             bot.update(dt, kefka_remaining)
 
         # Tick debuffs; check Allagan Field / Beyond Death expiry for the player
+        _af = next((d for d in self.player.debuffs if d.debuff_type == 'allagan_field'), None)
         had_allagan = (self._player_allagan_original_wound is not None
-                       and any(d.debuff_type == 'allagan_field' for d in self.player.debuffs))
+                       and _af is not None and _af.remaining is not None and _af.remaining > 0)
+        _bd = next((d for d in self.player.debuffs if d.debuff_type == 'beyond_death'), None)
         had_beyond = (self._player_beyond_death_original_wound is not None
-                      and any(d.debuff_type == 'beyond_death' for d in self.player.debuffs))
+                      and _bd is not None and _bd.remaining is not None and _bd.remaining > 0)
         fl_cw_pre = {}
-        for r in self._debuffs_1_fl_roles | self._debuffs_1_cw_roles:
+        for r in (self._debuffs_1_fl_roles | self._debuffs_1_cw_roles
+                  | self._debuffs_2_fl_roles | self._debuffs_2_cw_roles):
             member = self._members.get(r)
             if member:
                 d = next((x for x in member.debuffs
                           if x.debuff_type in ('forked_lightning', 'compressed_water')), None)
-                if d:
+                if d and d.remaining is not None and d.remaining > 0:
                     fl_cw_pre[r] = (member, d)
+        entropy_pre = {}
+        for r, member in self._members.items():
+            d = next((x for x in member.debuffs if x.debuff_type == 'entropy'), None)
+            if d and d.remaining is not None and d.remaining > 0:
+                entropy_pre[r] = pygame.Vector2(member.position)
         cs_pre = {}
         cs_is_fake = None
+        cs_had_positive_remaining = False
         for r in self._debuffs_1_cs_roles:
             member = self._members.get(r)
             if member:
@@ -531,21 +677,48 @@ class Game:
                 cs_pre[r] = d is not None
                 if d:
                     cs_is_fake = d.is_fake
+                    if d.remaining is not None and d.remaining > 0:
+                        cs_had_positive_remaining = True
             else:
                 cs_pre[r] = False
 
+        cs_pre_2 = {}
+        cs_is_fake_2 = None
+        cs_had_positive_remaining_2 = False
+        for r in self._debuffs_2_cs_roles:
+            member = self._members.get(r)
+            if member:
+                d = next((x for x in member.debuffs if x.debuff_type == 'cursed_shriek'), None)
+                cs_pre_2[r] = d is not None
+                if d:
+                    cs_is_fake_2 = d.is_fake
+                    if d.remaining is not None and d.remaining > 0:
+                        cs_had_positive_remaining_2 = True
+            else:
+                cs_pre_2[r] = False
+        df_pre = {}
+        for r, member in self._members.items():
+            d = next((x for x in member.debuffs if x.debuff_type == 'dynamic_fluid'), None)
+            if d and d.remaining is not None and d.remaining > 0:
+                df_pre[r] = pygame.Vector2(member.position)
+
         # AB window activation + per-frame violation tracking (read remaining before tick)
         player_ab = next((d for d in self.player.debuffs if d.debuff_type == 'acceleration_bomb'), None)
-        if not self._ab_window_active and player_ab and player_ab.remaining is not None and player_ab.remaining <= 0.5:
+        if not self._ab_window_active and player_ab and player_ab.remaining is not None and 0 < player_ab.remaining <= 0.5:
             self._ab_window_active = True
             self._ab_window_end = self._elapsed + player_ab.remaining + 0.5
             self._ab_is_fake = player_ab.is_fake
             self._ab_violated = False
+            self._ab_stationary_dur = 0.0
         if self._ab_window_active:
             if not self._ab_is_fake and self.player._is_moving:
                 self._ab_violated = True
             elif self._ab_is_fake and not self.player._is_moving:
-                self._ab_violated = True
+                self._ab_stationary_dur += dt
+                if self._ab_stationary_dur >= 0.2:
+                    self._ab_violated = True
+            else:
+                self._ab_stationary_dur = 0.0
 
         self.player.update_debuffs(dt)
         allagan_expired = had_allagan and not any(d.debuff_type == 'allagan_field' for d in self.player.debuffs)
@@ -572,8 +745,8 @@ class Game:
             if had_af_or_bd and not any(d.debuff_type in ('allagan_field', 'beyond_death') for d in bot.debuffs):
                 bot.debuffs = [d for d in bot.debuffs if 'wound' not in d.debuff_type]
 
-        # CS gaze check
-        if cs_is_fake is not None and any(
+        # CS gaze check (skip if debuffs expired immediately due to start_time skip)
+        if cs_is_fake is not None and cs_had_positive_remaining and any(
                 cs_pre.get(r) and not any(x.debuff_type == 'cursed_shriek'
                 for x in (self._members[r].debuffs if r in self._members else []))
                 for r in self._debuffs_1_cs_roles):
@@ -617,6 +790,50 @@ class Game:
                         self._loss_reason = f"{kind}: {count} player{'s' if count != 1 else ''} hit instead of {expected}."
                         self.state = GameState.GAME_OVER
                         break
+
+        # CS2 gaze check
+        if cs_is_fake_2 is not None and cs_had_positive_remaining_2 and any(
+                cs_pre_2.get(r) and not any(x.debuff_type == 'cursed_shriek'
+                for x in (self._members[r].debuffs if r in self._members else []))
+                for r in self._debuffs_2_cs_roles):
+            self._fov_timer = 2.0
+            self._fov_facing = pygame.Vector2(self.player._facing)
+            others = [self._members[r] for r in self._debuffs_2_cs_roles
+                      if r in self._members and self._members[r] is not self.player]
+            if others and not self.player_was_hit:
+                in_cone = [self._in_fov(m.position, self.player.position, self._fov_facing) for m in others]
+                if cs_is_fake_2 and not all(in_cone):
+                    self.player_was_hit = True
+                    self._loss_reason = "Fake Cursed Shriek: not all Shriek players were in your field of view."
+                    self.state = GameState.GAME_OVER
+                elif not cs_is_fake_2 and any(in_cone):
+                    self.player_was_hit = True
+                    self._loss_reason = "Cursed Shriek: a Shriek player was inside your field of view."
+                    self.state = GameState.GAME_OVER
+
+        # Entropy expiry check
+        if entropy_pre and self._entropy_is_fake is not None:
+            for r, pos_at_expiry in entropy_pre.items():
+                member = self._members[r]
+                if not any(d.debuff_type == 'entropy' for d in member.debuffs):
+                    entropy_atk = EntropyAttack(pos_at_expiry, self._entropy_is_fake)
+                    self._attack_wrappers.append(_AttackWrapper(entropy_atk, self._elapsed + 2.0))
+                    if member is not self.player and not self._entropy_is_fake:
+                        direction = member._start_pos - pygame.Vector2(ARENA_CENTER)
+                        extended = pygame.Vector2(ARENA_CENTER) + direction.normalize() * (direction.length() + 100)
+                        member.set_destination(extended, force_move=True)
+
+        # Dynamic Fluid expiry check
+        if df_pre and self._dynamic_fluid_is_fake is not None:
+            for r, pos_at_expiry in df_pre.items():
+                member = self._members[r]
+                if not any(d.debuff_type == 'dynamic_fluid' for d in member.debuffs):
+                    df_atk = DynamicFluidAttack(pos_at_expiry, self._dynamic_fluid_is_fake)
+                    self._attack_wrappers.append(_AttackWrapper(df_atk, self._elapsed + 2.0))
+                    if member is not self.player and self._dynamic_fluid_is_fake:
+                        direction = member._start_pos - pygame.Vector2(ARENA_CENTER)
+                        extended = pygame.Vector2(ARENA_CENTER) + direction.normalize() * (direction.length() + 100)
+                        member.set_destination(extended, force_move=True)
 
         # AB window end evaluation
         if self._ab_window_active and self._elapsed >= self._ab_window_end:
