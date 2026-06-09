@@ -115,6 +115,9 @@ class PartyList:
     _NAME_DEBUFF_GAP = 14  # margin between name column and first debuff
     _DEBUFF_GAP = 2        # gap between debuff icons
     _PLAYER_ROW_COLOR = (255, 255, 255, 30)
+    _TOOLTIP_W = 200
+    _TOOLTIP_PAD = 6
+    _TOOLTIP_OFFSET = (12, 12)
 
     def __init__(self, roles, player_role, chaos_left):
         self._roles = roles
@@ -131,6 +134,8 @@ class PartyList:
         self._drag_offset = (0, 0)
         self._font = _make_font(FONT_NAME, FONT_SIZE_SMALL)
         self._dur_font = _make_font(FONT_NAME, FONT_SIZE_SMALL - 2)
+        self._tooltip_font = _make_font(FONT_NAME, FONT_SIZE_SMALL + 2)
+        self._tooltip_desc_font = _make_font(FONT_NAME, FONT_SIZE_SMALL)
         self._bg_locked = _make_bg(PARTY_LIST_WIDTH, h, locked=True)
         self._bg_unlocked = _make_bg(PARTY_LIST_WIDTH, h, locked=False)
         self._highlight = pygame.Surface((PARTY_LIST_WIDTH, PARTY_LIST_ROW_H), pygame.SRCALPHA)
@@ -160,6 +165,8 @@ class PartyList:
         surface.blit(self._bg_locked if locked else self._bg_unlocked, screen_rect.topleft)
 
         debuff_top_pad = (PARTY_LIST_ROW_H - ICON_H - self._dur_font.get_height() - 2) // 2
+        mouse_pos = pygame.mouse.get_pos()
+        hovered_debuff = None
 
         for i, role in enumerate(self._roles):
             row_y = screen_rect.y + self._PAD + i * PARTY_LIST_ROW_H
@@ -191,7 +198,53 @@ class PartyList:
                     dur_surf = self._dur_font.render(dur_text, True, (255, 255, 255))
                     dur_x = debuff_x + (ICON_W - dur_surf.get_width()) // 2
                     surface.blit(dur_surf, (dur_x, dy + ICON_H + 2))
+                if pygame.Rect(debuff_x, dy, ICON_W, ICON_H).collidepoint(mouse_pos):
+                    hovered_debuff = debuff
                 debuff_x += ICON_W + self._DEBUFF_GAP
+
+        if hovered_debuff:
+            self._draw_tooltip(surface, hovered_debuff, mouse_pos)
+
+    @staticmethod
+    def _wrap_text(font, text, max_width):
+        words = text.split(' ')
+        lines = []
+        current = []
+        for word in words:
+            test = ' '.join(current + [word])
+            if font.size(test)[0] <= max_width:
+                current.append(word)
+            else:
+                if current:
+                    lines.append(' '.join(current))
+                current = [word]
+        if current:
+            lines.append(' '.join(current))
+        return lines
+
+    def _draw_tooltip(self, surface, debuff, cursor_pos):
+        PAD = self._TOOLTIP_PAD
+        W = self._TOOLTIP_W
+        desc_lines = self._wrap_text(self._tooltip_desc_font, debuff.description, W - 2 * PAD)
+        name_h = self._tooltip_font.get_height()
+        line_h = self._tooltip_desc_font.get_height() + 1
+        h = PAD + name_h + 4 + len(desc_lines) * line_h + PAD
+        x = cursor_pos[0] + self._TOOLTIP_OFFSET[0]
+        y = cursor_pos[1] + self._TOOLTIP_OFFSET[1]
+        sw, sh = surface.get_size()
+        if x + W > sw:
+            x = cursor_pos[0] - W - 4
+        if y + h > sh:
+            y = cursor_pos[1] - h - 4
+        bg = pygame.Surface((W, h), pygame.SRCALPHA)
+        bg.fill((0, 0, 0, 210))
+        surface.blit(bg, (x, y))
+        cy = y + PAD
+        surface.blit(self._tooltip_font.render(debuff.name, True, (255, 255, 255)), (x + PAD, cy))
+        cy += name_h + 4
+        for line in desc_lines:
+            surface.blit(self._tooltip_desc_font.render(line, True, (200, 200, 200)), (x + PAD, cy))
+            cy += line_h
 
 
 _MACRO_BUTTONS = [
