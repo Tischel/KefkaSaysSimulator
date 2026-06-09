@@ -3,8 +3,7 @@ import os
 import random
 import pygame
 from constants import ARENA_CENTER, PLAYER_SPEED
-
-_ASSETS = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'assets'))
+from _paths import ASSETS as _ASSETS
 
 CIRCLE_ORDER = ['T1', 'R2', 'H2', 'M2', 'T2', 'M1', 'H1', 'R1']
 _CIRCLE_RADIUS = 150

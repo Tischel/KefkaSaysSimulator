@@ -16,8 +16,7 @@ from constants import (
     DYNAMIC_FLUID_COLOR, DYNAMIC_FLUID_TELEGRAPH_COLOR, DYNAMIC_FLUID_RADIUS,
 )
 from debuff import Debuff
-
-_ASSETS = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'assets'))
+from _paths import ASSETS as _ASSETS
 _orb_real = None
 _orb_fake = None
 

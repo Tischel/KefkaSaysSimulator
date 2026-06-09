@@ -1,8 +1,7 @@
 import math
 import os
 import pygame
-
-_ASSETS = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'assets'))
+from _paths import ASSETS as _ASSETS
 _icon_cache = {}
 
 ICON_W = 24

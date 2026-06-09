@@ -8,8 +8,7 @@ from constants import (
     FONT_NAME, FONT_SIZE_NORMAL, FONT_SIZE_SMALL,
 )
 from debuff import ICON_W, ICON_H
-
-_ASSETS = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'assets'))
+from _paths import ASSETS as _ASSETS
 
 
 def _make_font(name, size):

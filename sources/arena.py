@@ -1,8 +1,7 @@
 import os
 import pygame
 from constants import BACKGROUND_COLOR, ARENA_CENTER
-
-_ASSETS = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'assets'))
+from _paths import ASSETS as _ASSETS
 
 
 class Arena:

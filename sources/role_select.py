@@ -4,8 +4,7 @@ from constants import (
     BACKGROUND_COLOR, ARENA_CENTER,
     FONT_NAME, FONT_SIZE_LARGE, FONT_SIZE_NORMAL, FONT_SIZE_SMALL,
 )
-
-_ASSETS = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'assets'))
+from _paths import ASSETS as _ASSETS
 
 _ROLES = [
     ('T1', 'Tank 1'),   ('T2', 'Tank 2'),

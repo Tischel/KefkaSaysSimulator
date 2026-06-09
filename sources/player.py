@@ -1,8 +1,7 @@
 import os
 import pygame
 from constants import ARENA_CENTER, ARENA_RADIUS, PLAYER_SPEED
-
-_ASSETS = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'assets'))
+from _paths import ASSETS as _ASSETS
 
 
 class Player:

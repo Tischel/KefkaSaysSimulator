@@ -174,8 +174,11 @@ class Game:
                 actual_action = self._chaos_queue.pop(0)
                 actual_cast_name = 'Tsunami' if actual_action == 'chaos_tsunami' else 'Inferno'
                 self._active_casts[caster] = _ActiveCast(actual_cast_name, duration)
-                # first cast gets 84s debuffs, second gets 45s — bait fires 5s before expiry
-                debuff_dur = 84.0 if len(self._chaos_queue) == 1 else 45.0
+                is_first_cast = len(self._chaos_queue) == 1
+                if actual_action == 'chaos_tsunami':
+                    debuff_dur = 84.0 if is_first_cast else 69.0
+                else:
+                    debuff_dur = 60.0 if is_first_cast else 45.0
                 bait_offset = debuff_dur - 5.0
                 is_fake = random.choice([True, False])
                 self._pending_actions.append((t + duration, actual_action, is_fake))
@@ -338,7 +341,7 @@ class Game:
                         (d.debuff_type for d in player.debuffs if 'wound' in d.debuff_type), None)
 
         elif action == 'chaos_tsunami':
-            debuff_dur = 84.0 if self._chaos_cast_count == 0 else 45.0
+            debuff_dur = 84.0 if self._chaos_cast_count == 0 else 69.0
             self._chaos_cast_count += 1
             self._dynamic_fluid_is_fake = is_fake
             for r in (supports + dps):
@@ -347,7 +350,7 @@ class Game:
                 self.enemies.hide_chaos()
 
         elif action == 'chaos_entropy':
-            debuff_dur = 84.0 if self._chaos_cast_count == 0 else 45.0
+            debuff_dur = 60.0 if self._chaos_cast_count == 0 else 45.0
             self._chaos_cast_count += 1
             self._entropy_is_fake = is_fake
             for r in (supports + dps):
