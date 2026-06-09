@@ -42,9 +42,11 @@ class _ActiveCast:
 
 
 class _AttackWrapper:
-    def __init__(self, attack, trigger_time):
+    def __init__(self, attack, trigger_time, shape_start_time=None, skip_hit_check=False):
         self.attack = attack
         self.trigger_time = trigger_time
+        self.shape_start_time = shape_start_time  # shapes hidden until this elapsed time
+        self.skip_hit_check = skip_hit_check
         self.hit_elapsed = 0.0
         self.triggered = False
 
@@ -64,7 +66,7 @@ def _attack_alpha(hit_elapsed):
 
 
 class Game:
-    def __init__(self, role='T1'):
+    def __init__(self, role='T1', start_time=0.0):
         self._role = role
         self.arena = Arena()
         positions = circle_positions()
@@ -88,11 +90,16 @@ class Game:
         self._attack_mask.fill((0, 0, 0, 0))
         pygame.draw.circle(self._attack_mask, (255, 255, 255, 255), ARENA_CENTER, ARENA_RADIUS)
         self.hud_locked = True
-        self._elapsed = 0.0
+        self._start_time = start_time
+        self._elapsed = start_time
         self._timeline_idx = 0
         self._active_casts = {}   # caster_name → _ActiveCast
         self._attack_wrappers = []
         self._pending_actions = []  # (trigger_time, action_type, is_fake)
+        self._thrumming_thunder_attack = None
+        self._blizzard_attack = None
+        self._mana_release_lightning = None
+        self._mana_release_ice = None
 
     # ------------------------------------------------------------------
     # Timeline
@@ -145,17 +152,61 @@ class Game:
                     AntilightAttack('white', sides[0], neo_rect, is_fake), t + duration))
                 self._attack_wrappers.append(_AttackWrapper(
                     AntilightAttack('black', sides[1], neo_rect, is_fake), t + duration))
+            elif action == 'thrumming_thunder':
+                lightning = LightningAttack()
+                self._thrumming_thunder_attack = lightning
+                # no ice present — pick any ice pair index to look up a lightning-safe spot
+                key = (lightning.angle, lightning.effective_pair_idx, random.randint(0, 1))
+                spot = SAFE_SPOTS[key]
+                for bot in self.bots:
+                    s = random.choice(spot) if isinstance(spot, list) else spot
+                    bot.set_destination((ARENA_CENTER[0] + s[0], ARENA_CENTER[1] + s[1]))
+                self._attack_wrappers.append(_AttackWrapper(lightning, t + duration))
+            elif action == 'blizzard_blowout':
+                ice = IceAttack()
+                self._blizzard_attack = ice
+                # no lightning present — pick any lightning combo to look up an ice-safe spot
+                key = (random.choice([45, -45]), random.randint(0, 1), ice.effective_pair_idx)
+                spot = SAFE_SPOTS[key]
+                for bot in self.bots:
+                    s = random.choice(spot) if isinstance(spot, list) else spot
+                    bot.set_destination((ARENA_CENTER[0] + s[0], ARENA_CENTER[1] + s[1]))
+                self._attack_wrappers.append(_AttackWrapper(ice, t + duration))
+            elif action == 'mana_release':
+                shape_start = t + duration          # cast end: shapes appear
+                trigger = t + duration + 5.0        # 5s later: hit
+                lightning = LightningAttack()
+                ice = IceAttack()
+                self._mana_release_lightning = lightning
+                self._mana_release_ice = ice
+                # bots use the XNOR-adjusted effective pairs to find the correct safe spot
+                if self._thrumming_thunder_attack and self._blizzard_attack:
+                    final_l_fake = lightning.is_fake != self._thrumming_thunder_attack.is_fake
+                    final_l_pair = lightning._idx if not final_l_fake else 1 - lightning._idx
+                    final_i_fake = ice.is_fake != self._blizzard_attack.is_fake
+                    final_i_pair = ice._idx if not final_i_fake else 1 - ice._idx
+                    key = (lightning.angle, final_l_pair, final_i_pair)
+                    spot = SAFE_SPOTS[key]
+                    for bot in self.bots:
+                        s = random.choice(spot) if isinstance(spot, list) else spot
+                        bot.set_destination((ARENA_CENTER[0] + s[0], ARENA_CENTER[1] + s[1]),
+                                            time_to_hit=10.0)
+                self._attack_wrappers.append(_AttackWrapper(
+                    lightning, trigger, shape_start_time=shape_start, skip_hit_check=True))
+                self._attack_wrappers.append(_AttackWrapper(
+                    ice, trigger, shape_start_time=shape_start, skip_hit_check=True))
+                self._pending_actions.append((trigger, 'mana_release_hit', None))
 
     def _fire_pending_actions(self):
         remaining = []
         for (trigger_time, action, is_fake) in self._pending_actions:
             if self._elapsed >= trigger_time:
-                self._apply_action(action, is_fake)
+                self._apply_action(action, is_fake, skip_hit=trigger_time <= self._start_time)
             else:
                 remaining.append((trigger_time, action, is_fake))
         self._pending_actions = remaining
 
-    def _apply_action(self, action, is_fake):
+    def _apply_action(self, action, is_fake, skip_hit=False):
         supports = SUPPORTS[:]
         dps = DPS[:]
 
@@ -220,6 +271,20 @@ class Game:
         elif action == 'flood_of_naught':
             self.enemies.hide_neo()
 
+        elif action == 'mana_release_hit':
+            if self._mana_release_lightning and self._thrumming_thunder_attack:
+                final_fake = self._mana_release_lightning.is_fake != self._thrumming_thunder_attack.is_fake
+                self._mana_release_lightning.is_fake = final_fake
+                if not skip_hit and self._mana_release_lightning.is_hit(self.player.get_center()):
+                    self.player_was_hit = True
+                    self.state = GameState.GAME_OVER
+            if not self.player_was_hit and self._mana_release_ice and self._blizzard_attack:
+                final_fake = self._mana_release_ice.is_fake != self._blizzard_attack.is_fake
+                self._mana_release_ice.is_fake = final_fake
+                if not skip_hit and self._mana_release_ice.is_hit(self.player.get_center()):
+                    self.player_was_hit = True
+                    self.state = GameState.GAME_OVER
+
     def _add(self, role, debuff):
         member = self._members.get(role)
         if member:
@@ -241,11 +306,16 @@ class Game:
             bot.reset()
         self.state = GameState.RUNNING
         self.player_was_hit = False
+        self._start_time = 0.0
         self._elapsed = 0.0
         self._timeline_idx = 0
         self._active_casts = {}
         self._attack_wrappers = []
         self._pending_actions = []
+        self._thrumming_thunder_attack = None
+        self._blizzard_attack = None
+        self._mana_release_lightning = None
+        self._mana_release_ice = None
         self.enemies.reset()
         self.macro_output.clear()
 
@@ -283,7 +353,9 @@ class Game:
                 w.triggered = True
                 if hasattr(w.attack, 'apply_hit_effect'):
                     w.attack.apply_hit_effect(self._members)
-                elif w.attack.is_hit(self.player.get_center()):
+                elif (not w.skip_hit_check
+                      and w.trigger_time > self._start_time
+                      and w.attack.is_hit(self.player.get_center())):
                     self.player_was_hit = True
                     self.state = GameState.GAME_OVER
         self._attack_wrappers = [w for w in self._attack_wrappers if not w.is_done]
@@ -313,8 +385,9 @@ class Game:
             self._attack_surf.fill((0, 0, 0, 0))
             for w in self._attack_wrappers:
                 if not w.triggered:
-                    w.attack.render(self._attack_surf, telegraphing=True,
-                                    alpha=TELEGRAPH_ALPHA, offset=(0, 0))
+                    if w.shape_start_time is None or self._elapsed >= w.shape_start_time:
+                        w.attack.render(self._attack_surf, telegraphing=True,
+                                        alpha=TELEGRAPH_ALPHA, offset=(0, 0))
                 else:
                     w.attack.render(self._attack_surf, telegraphing=False,
                                     alpha=_attack_alpha(w.hit_elapsed), offset=(0, 0))

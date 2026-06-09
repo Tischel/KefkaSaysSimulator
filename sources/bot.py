@@ -30,16 +30,23 @@ class Bot:
         self.position = pygame.Vector2(start_pos)
         self._destination = None
         self._moving = False
+        self._move_delay = 0.0
         self.debuffs = []
 
-    def set_destination(self, base_dest):
+    def set_destination(self, base_dest, time_to_hit=None):
         angle = random.uniform(0, 2 * math.pi)
         dist = random.uniform(0, _JITTER)
-        self._destination = pygame.Vector2(
+        dest = pygame.Vector2(
             base_dest[0] + math.cos(angle) * dist,
             base_dest[1] + math.sin(angle) * dist,
         )
+        self._destination = dest
         self._moving = False
+        if time_to_hit is not None:
+            travel_time = (dest - self.position).length() / PLAYER_SPEED
+            self._move_delay = max(0.0, time_to_hit - travel_time * 1.1)
+        else:
+            self._move_delay = 0.0
 
     def update_debuffs(self, dt):
         for d in self.debuffs:
@@ -53,10 +60,14 @@ class Bot:
         self.position = pygame.Vector2(self._start_pos)
         self._destination = None
         self._moving = False
+        self._move_delay = 0.0
         self.debuffs = []
 
     def update(self, dt, state_timer):
         if self._destination is None:
+            return
+        if self._move_delay > 0:
+            self._move_delay = max(0.0, self._move_delay - dt)
             return
         to_dest = self._destination - self.position
         dist = to_dest.length()

@@ -67,8 +67,13 @@ TIMELINE = [
     (30.012, 'Chaos',       'Inferno',        9.0, 'chaos_entropy'),
     (39.655, 'Kefka',       'Mystery Magic',    5.0, 'mystery_magic'),
     (39.877, 'Neo Exdeath', 'Grand Cross',      9.0, 'neo_debuffs_3'),
-    (56.023, 'Neo Exdeath', 'Flood of Naught',  5.0, 'flood_of_naught'),
-    (66.768, 'Kefka',       'Mana Charge',      3.0, None),
+    (56.023, 'Neo Exdeath', 'Flood of Naught',       5.0, 'flood_of_naught'),
+    (66.768, 'Kefka',       'Mana Charge',           3.0, None),
+    (73.013, 'Kefka',       'Thrumming Thunder III', 5.0, 'thrumming_thunder'),
+    (83.148, 'Kefka',       'Ultima Upsurge',        5.0, None),
+    (90.994, 'Kefka',       'Blizzard III Blowout',  5.0, 'blizzard_blowout'),
+   (102.172, 'Kefka',       'Mana Release',          5.0, 'mana_release'),
+   (121.948, 'Kefka',       'Ultima Upsurge',        5.0, None),
 ]
 ROLE_NAMES = {
     'T1': 'Tank 1',

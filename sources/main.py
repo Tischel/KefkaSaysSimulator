@@ -34,7 +34,8 @@ def main():
         role_select.render(screen, arena_offset)
         pygame.display.flip()
 
-    game = Game(selected_role)
+    start_time = float(sys.argv[1]) if len(sys.argv) > 1 else 0.0
+    game = Game(selected_role, start_time=start_time)
     legend = Legend()
     fps_counter = FpsCounter()
 
