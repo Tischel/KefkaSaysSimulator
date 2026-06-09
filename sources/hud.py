@@ -123,7 +123,7 @@ class FpsCounter:
 
 
 class Legend:
-    _LINES = ["(ESC) Quit", "(R) Restart", "(U) Unlock/Lock HUD"]
+    _LINES = ["(ESC) Quit", "(R) Restart", "(U) Unlock/Lock HUD", "(T) Toggle fake debuffs help"]
 
     def __init__(self):
         self._font = _make_font(FONT_NAME, FONT_SIZE_SMALL)
@@ -278,16 +278,20 @@ class PartyList:
 
 
 _MACRO_BUTTONS = [
+    ('button_ice.png',       'Ice: REAL'),
+    ('button_fake.png',      'Ice: FAKE'),
+    ('button_thunder.png',   'Thunder: REAL'),
+    ('button_fake.png',      'Thunder: FAKE'),
     ('button_fire.png',      'Fire: TWISTER'),
     ('button_fake.png',      'Fire: DONUT'),
     ('button_water.png',     'Water: DONUT'),
     ('button_fake.png',      'Water: TWISTER'),
-    ('button_spread.png',    'SPREAD'),
-    ('button_stack.png',     'STACK'),
     ('button_gaze.png',      'Gaze: REAL'),
     ('button_fake.png',      'Gaze: FAKE'),
     ('button_stillness.png', 'STILLNESS'),
     ('button_fake.png',      'MOTION'),
+    ('button_spread.png',    'SPREAD'),
+    ('button_stack.png',     'STACK'),
 ]
 
 
@@ -393,7 +397,7 @@ class MacroButtons:
     _BTN_MARGIN = 4
     _PAD = 4
     _COLS = 2
-    _ROWS = 5
+    _ROWS = 7
 
     def __init__(self, macro_output):
         self._macro_output = macro_output

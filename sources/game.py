@@ -27,6 +27,7 @@ from hud import EnemyList, PartyList, MacroOutput, MacroButtons, Timer, _make_fo
 class GameState(Enum):
     RUNNING = 0
     GAME_OVER = 1
+    VICTORY = 2
 
 
 class _ActiveCast:
@@ -97,6 +98,7 @@ class Game:
         self._attack_mask.fill((0, 0, 0, 0))
         pygame.draw.circle(self._attack_mask, (255, 255, 255, 255), ARENA_CENTER, ARENA_RADIUS)
         self.hud_locked = True
+        self._show_fake_help = False
         self._start_time = start_time
         self._elapsed = start_time
         self._timeline_idx = 0
@@ -110,6 +112,7 @@ class Game:
         self._blizzard_attack = None
         self._mana_release_lightning = None
         self._mana_release_ice = None
+        self._mana_release_safe_spot = None
         self._debuffs_1_fl_roles = set()
         self._debuffs_1_cw_roles = set()
         self._debuffs_1_cs_roles = set()
@@ -236,11 +239,9 @@ class Game:
                     final_i_fake = ice.is_fake != self._blizzard_attack.is_fake
                     final_i_pair = ice._idx if not final_i_fake else 1 - ice._idx
                     key = (lightning.angle, final_l_pair, final_i_pair)
-                    spot = SAFE_SPOTS[key]
-                    for bot in self.bots:
-                        s = random.choice(spot) if isinstance(spot, list) else spot
-                        bot.set_destination((ARENA_CENTER[0] + s[0], ARENA_CENTER[1] + s[1]),
-                                            time_to_hit=10.0)
+                    self._mana_release_safe_spot = SAFE_SPOTS[key]
+                    # schedule bot movement 3s before hit so DF mechanics don't overwrite it
+                    self._pending_actions.append((trigger - 3.0, 'mana_release_bots', None))
                 self._attack_wrappers.append(_AttackWrapper(
                     lightning, trigger, shape_start_time=shape_start, skip_hit_check=True))
                 self._attack_wrappers.append(_AttackWrapper(
@@ -504,6 +505,16 @@ class Game:
                     force_move=True,
                 )
 
+        elif action == 'mana_release_bots':
+            if self._mana_release_safe_spot is not None:
+                spot = self._mana_release_safe_spot
+                for bot in self.bots:
+                    s = random.choice(spot) if isinstance(spot, list) else spot
+                    bot.set_destination(
+                        (ARENA_CENTER[0] + s[0], ARENA_CENTER[1] + s[1]),
+                        time_to_hit=3.0, force_move=True,
+                    )
+
         elif action == 'mana_release_hit':
             if self._mana_release_lightning and self._thrumming_thunder_attack:
                 final_fake = self._mana_release_lightning.is_fake != self._thrumming_thunder_attack.is_fake
@@ -555,6 +566,7 @@ class Game:
         self._blizzard_attack = None
         self._mana_release_lightning = None
         self._mana_release_ice = None
+        self._mana_release_safe_spot = None
         self._debuffs_1_fl_roles = set()
         self._debuffs_1_cw_roles = set()
         self._debuffs_1_cs_roles = set()
@@ -584,19 +596,21 @@ class Game:
                     return
                 if event.key == pygame.K_u:
                     self.hud_locked = not self.hud_locked
+                if event.key == pygame.K_t:
+                    self._show_fake_help = not self._show_fake_help
 
         self.enemy_list.update(events, self.hud_locked, arena_offset)
         self.party_list.update(events, self.hud_locked, arena_offset)
         self.macro_output.update(events, self.hud_locked, arena_offset)
         self.macro_buttons.update(events, self.hud_locked, arena_offset)
-        self.timer.update(dt, paused=(self.state == GameState.GAME_OVER))
+        self.timer.update(dt, paused=(self.state in (GameState.GAME_OVER, GameState.VICTORY)))
         if self._fov_timer > 0:
             self._fov_timer = max(0.0, self._fov_timer - dt)
         self._fl_cw_hit_circles = [c for c in self._fl_cw_hit_circles if c[3] > 0]
         for c in self._fl_cw_hit_circles:
             c[3] = max(0.0, c[3] - dt)
 
-        if self.state == GameState.GAME_OVER:
+        if self.state in (GameState.GAME_OVER, GameState.VICTORY):
             return
 
         self._elapsed += dt
@@ -846,6 +860,13 @@ class Game:
                     self._loss_reason = "Acceleration Bomb: you moved."
                 self.state = GameState.GAME_OVER
 
+        # Victory: timeline exhausted, no pending actions or unresolved attacks remain
+        if (not self.player_was_hit
+                and self._timeline_idx >= len(TIMELINE)
+                and not self._pending_actions
+                and not self._attack_wrappers):
+            self.state = GameState.VICTORY
+
     def _build_active_casts_hud(self):
         result = {}
         for caster, cast in self._active_casts.items():
@@ -888,13 +909,15 @@ class Game:
         self.enemy_list.render(surface, self._build_active_casts_hud(),
                                self.hud_locked, arena_offset)
         self.party_list.render(surface, self.hud_locked, self._members, arena_offset,
-                               debug_mode=self._start_time > 0)
+                               debug_mode=self._show_fake_help)
         self.macro_output.render(surface, self.hud_locked, arena_offset)
         self.macro_buttons.render(surface, self.hud_locked, arena_offset)
         self.timer.render(surface, arena_offset)
 
         if self.state == GameState.GAME_OVER:
             self._render_game_over(surface, arena_offset)
+        elif self.state == GameState.VICTORY:
+            self._render_victory(surface, arena_offset)
 
     def _in_fov(self, target_pos, origin_pos, facing):
         v = pygame.Vector2(target_pos) - pygame.Vector2(origin_pos)
@@ -931,5 +954,18 @@ class Game:
         if self._loss_reason:
             reason_text = self._font_normal.render(self._loss_reason, True, (255, 180, 180))
             surface.blit(reason_text, reason_text.get_rect(center=(cx, cy)))
+        restart_text = self._font_normal.render("Press R to restart", True, (255, 255, 255))
+        surface.blit(restart_text, restart_text.get_rect(center=(cx, cy + 40)))
+
+    def _render_victory(self, surface, arena_offset=(0, 0)):
+        overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 153))
+        surface.blit(overlay, (0, 0))
+        cx = arena_offset[0] + WINDOW_WIDTH // 2
+        cy = arena_offset[1] + WINDOW_HEIGHT // 2
+        win_text = self._font_large.render("CLEAR!", True, (255, 223, 0))
+        surface.blit(win_text, win_text.get_rect(center=(cx, cy - 50)))
+        sub_text = self._font_normal.render("Phase 4 complete. Well done!", True, (200, 255, 200))
+        surface.blit(sub_text, sub_text.get_rect(center=(cx, cy)))
         restart_text = self._font_normal.render("Press R to restart", True, (255, 255, 255))
         surface.blit(restart_text, restart_text.get_rect(center=(cx, cy + 40)))

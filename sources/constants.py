@@ -74,7 +74,6 @@ TIMELINE = [
     (83.148, 'Kefka',       'Ultima Upsurge',        5.0, None),
     (90.994, 'Kefka',       'Blizzard III Blowout',  5.0, 'blizzard_blowout'),
    (102.172, 'Kefka',       'Mana Release',          5.0, 'mana_release'),
-   (121.948, 'Kefka',       'Ultima Upsurge',        5.0, None),
 ]
 ROLE_NAMES = {
     'T1': 'Tank 1',
