@@ -339,6 +339,7 @@ class Game:
                 elif any(d.debuff_type == 'beyond_death' for d in player.debuffs):
                     self._player_beyond_death_original_wound = next(
                         (d.debuff_type for d in player.debuffs if 'wound' in d.debuff_type), None)
+            self.enemies.teleport_neo_north()
 
         elif action == 'chaos_tsunami':
             debuff_dur = 84.0 if self._chaos_cast_count == 0 else 69.0

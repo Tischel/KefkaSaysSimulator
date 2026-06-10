@@ -10,7 +10,7 @@ from role_select import RoleSelectScreen
 def main():
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.RESIZABLE)
-    pygame.display.set_caption("Kefka Says Simulator v0.0.1")
+    pygame.display.set_caption("Kefka Says Simulator v0.0.2")
     hwnd = pygame.display.get_wm_info()['window']
     ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0x0001 | 0x0004)  # move to primary monitor origin, keep size/z-order
     ctypes.windll.user32.ShowWindow(hwnd, 3)

@@ -238,7 +238,7 @@ class AntilightAttack:
         neo = self._neo_rect.move(ox, oy)
         iw, ih = ANTILIGHT_TELEGRAPH_SIZE
         img_x = (neo.left - iw - ANTILIGHT_TELEGRAPH_GAP) if self.side == 'west' else (neo.right + ANTILIGHT_TELEGRAPH_GAP)
-        img_y = neo.centery - ih // 2
+        img_y = neo.centery - ih // 2 + 50
         surface.blit(self._telegraph_img, (img_x, img_y))
 
     def is_hit(self, point):
