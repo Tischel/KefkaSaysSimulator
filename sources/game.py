@@ -570,6 +570,8 @@ class Game:
     # ------------------------------------------------------------------
 
     def _handle_pause(self):
+        if (self.state in (GameState.GAME_OVER, GameState.VICTORY)):
+            return
         if (self.state == GameState.PAUSED):
             self.state = GameState.RUNNING
         else:
