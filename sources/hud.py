@@ -122,7 +122,7 @@ class FpsCounter:
 
 
 class Legend:
-    _LINES = ["(ESC) Quit", "(R) Restart", "(U) Unlock/Lock HUD", "(T) Toggle fake debuffs help"]
+    _LINES = ["(ESC) Quit", "(R) Restart", "(U) Unlock/Lock HUD", "(T) Toggle fake debuffs help", "(P) Pause"]
 
     def __init__(self):
         self._font = _make_font(FONT_NAME, FONT_SIZE_SMALL)

@@ -1,0 +1,1 @@
+pyinstaller --onefile --noconsole --add-data=assets:assets sources/main.py

@@ -28,6 +28,7 @@ class GameState(Enum):
     RUNNING = 0
     GAME_OVER = 1
     VICTORY = 2
+    PAUSED = 3
 
 
 class _ActiveCast:
@@ -568,6 +569,14 @@ class Game:
     # Update / Render
     # ------------------------------------------------------------------
 
+    def _handle_pause(self):
+        if (self.state in (GameState.GAME_OVER, GameState.VICTORY)):
+            return
+        if (self.state == GameState.PAUSED):
+            self.state = GameState.RUNNING
+        else:
+            self.state = GameState.PAUSED
+
     def _reset(self):
         self.player = Player(self._role, self._player_start)
         self._members[self._role] = self.player
@@ -614,6 +623,9 @@ class Game:
     def update(self, dt, keys, events, arena_offset=(0, 0)):
         for event in events:
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_p:
+                    self._handle_pause()
+                    return
                 if event.key == pygame.K_r:
                     self._reset()
                     return
@@ -626,14 +638,14 @@ class Game:
         self.party_list.update(events, self.hud_locked, arena_offset)
         self.macro_output.update(events, self.hud_locked, arena_offset)
         self.macro_buttons.update(events, self.hud_locked, arena_offset)
-        self.timer.update(dt, paused=(self.state in (GameState.GAME_OVER, GameState.VICTORY)))
+        self.timer.update(dt, paused=(self.state in (GameState.GAME_OVER, GameState.VICTORY, GameState.PAUSED)))
         if self._fov_timer > 0:
             self._fov_timer = max(0.0, self._fov_timer - dt)
         self._fl_cw_hit_circles = [c for c in self._fl_cw_hit_circles if c[3] > 0]
         for c in self._fl_cw_hit_circles:
             c[3] = max(0.0, c[3] - dt)
 
-        if self.state in (GameState.GAME_OVER, GameState.VICTORY):
+        if self.state in (GameState.GAME_OVER, GameState.VICTORY, GameState.PAUSED):
             return
 
         self._elapsed += dt
